@@ -1,26 +1,47 @@
 @import "tailwindcss";
 
+@theme {
+  --color-retro-bg: #1a1b26;
+  --color-retro-paper: #24283b;
+  --color-retro-primary: #7aa2f7;
+  --color-retro-secondary: #bb9af7;
+  --color-retro-accent: #ff9e64;
+  --color-retro-text: #c0caf5;
+  --color-retro-muted: #565f89;
+
+  --font-serif: "Noto Serif SC", serif;
+  --font-sans: "Inter", sans-serif;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #1a1b26;
+  --foreground: #c0caf5;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@layer base {
+  body {
+    @apply bg-retro-bg text-retro-text font-sans antialiased;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-serif font-bold tracking-tight;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-retro-bg;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-retro-muted rounded-full;
 }

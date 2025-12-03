@@ -10,27 +10,25 @@ const __dirname = path.dirname(__filename);
 // Load env vars from .env.local manually to ensure it works
 const envPath = path.resolve(__dirname, '../.env.local');
 if (fs.existsSync(envPath)) {
-    const envConfig = dotenv.parse(fs.readFileSync(envPath));
-    for (const k in envConfig) {
-        process.env[k] = envConfig[k];
-    }
+  const envConfig = dotenv.parse(fs.readFileSync(envPath));
+  for (const k in envConfig) {
+    process.env[k] = envConfig[k];
+  }
 }
 
 const connectionString = process.env.SUPABASE_DB_URL;
 
 if (!connectionString) {
-    console.error('Missing SUPABASE_DB_URL in .env.local');
-    process.exit(1);
+  console.error('Missing SUPABASE_DB_URL in .env.local');
+  process.exit(1);
 }
 
 const client = new Client({
-    connectionString,
+  connectionString,
 });
 
 const schemaSql = `
-CREATE SCHEMA IF NOT EXISTS chinese;
-
-CREATE TABLE IF NOT EXISTS chinese.profiles (
+CREATE TABLE IF NOT EXISTS public.chinese_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id),
   hsk_level INTEGER DEFAULT 1,
   pinyin_preference TEXT DEFAULT 'hidden',
@@ -38,7 +36,7 @@ CREATE TABLE IF NOT EXISTS chinese.profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS chinese.stories (
+CREATE TABLE IF NOT EXISTS public.chinese_stories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id),
   title TEXT NOT NULL,
@@ -47,7 +45,7 @@ CREATE TABLE IF NOT EXISTS chinese.stories (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS chinese.vocab_items (
+CREATE TABLE IF NOT EXISTS public.chinese_vocab_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id),
   word TEXT NOT NULL,
@@ -62,28 +60,28 @@ CREATE TABLE IF NOT EXISTS chinese.vocab_items (
   UNIQUE(user_id, word)
 );
 
-CREATE TABLE IF NOT EXISTS chinese.reviews (
+CREATE TABLE IF NOT EXISTS public.chinese_reviews (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id),
-  vocab_item_id UUID REFERENCES chinese.vocab_items(id),
+  vocab_item_id UUID REFERENCES public.chinese_vocab_items(id),
   rating INTEGER NOT NULL,
   review_time TIMESTAMPTZ DEFAULT NOW()
 );
 `;
 
 async function setup() {
-    try {
-        await client.connect();
-        console.log('Connected to database');
+  try {
+    await client.connect();
+    console.log('Connected to database');
 
-        await client.query(schemaSql);
-        console.log('Schema and tables created successfully');
+    await client.query(schemaSql);
+    console.log('Schema and tables created successfully');
 
-    } catch (err) {
-        console.error('Error setting up database:', err);
-    } finally {
-        await client.end();
-    }
+  } catch (err) {
+    console.error('Error setting up database:', err);
+  } finally {
+    await client.end();
+  }
 }
 
 setup();

@@ -2,7 +2,6 @@
 
 import { generateStory } from '@/app/actions'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { Loader2, Shuffle, Sparkles } from 'lucide-react'
 
 const GENRES = [
@@ -63,21 +62,19 @@ export default function NewStoryPage() {
         }
     }, [genre, currentThemes, currentSettings, theme, setting])
 
-    const router = useRouter()
-
-    async function handleSubmit(formData: FormData) {
+    async function handleGenerate() {
         setIsLoading(true)
+        const formData = new FormData()
+        formData.append('genre', genre)
+        formData.append('theme', theme)
+        formData.append('setting', setting)
+        formData.append('length', length)
+
         try {
-            const result = await generateStory(formData)
-            if (result.success && result.storyId) {
-                router.push(`/story/${result.storyId}`)
-                // Don't set isLoading(false) here, let it spin until the page changes
-            } else {
-                throw new Error('Failed to generate story')
-            }
+            await generateStory(formData)
         } catch (error) {
             console.error(error)
-            alert('Something went wrong. Please try again.')
+            alert('Failed to generate story')
             setIsLoading(false)
         }
     }
@@ -89,7 +86,7 @@ export default function NewStoryPage() {
                 <h1 className="text-3xl font-bold text-retro-primary">Story Generator</h1>
             </div>
 
-            <form action={handleSubmit} className="bg-retro-paper p-8 rounded-xl border border-retro-muted/20 shadow-lg relative overflow-hidden">
+            <div className="bg-retro-paper p-8 rounded-xl border border-retro-muted/20 shadow-lg relative overflow-hidden">
                 {/* Decorative background element */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-retro-primary/5 rounded-bl-full -z-0" />
 
@@ -162,7 +159,8 @@ export default function NewStoryPage() {
                     </button>
 
                     <button
-                        type="submit"
+                        type="button"
+                        onClick={handleGenerate}
                         disabled={isLoading}
                         className="flex-1 flex items-center justify-center gap-2 rounded-full bg-retro-primary px-6 py-3 text-lg font-bold text-retro-bg hover:bg-retro-primary/90 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                     >
@@ -179,7 +177,7 @@ export default function NewStoryPage() {
                         )}
                     </button>
                 </div>
-            </form>
+            </div>
         </div>
     )
 }

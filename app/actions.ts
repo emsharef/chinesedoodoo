@@ -175,5 +175,5 @@ export async function generateStory(formData: FormData) {
         throw new Error(`Failed to save story: ${error.message} (${error.code})`)
     }
 
-    return { success: true, storyId: story.id }
+    redirect(`/story/${story.id}`)
 }

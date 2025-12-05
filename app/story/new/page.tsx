@@ -23,7 +23,10 @@ const LENGTH_OPTIONS = [
     { label: 'Long (~600 chars)', value: 'long' },
 ]
 
+import { useRouter } from 'next/navigation'
+
 export default function NewStoryPage() {
+    const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
     const [genre, setGenre] = useState(GENRES[0])
     const [theme, setTheme] = useState(FICTION_THEMES[0])
@@ -71,7 +74,12 @@ export default function NewStoryPage() {
         formData.append('length', length)
 
         try {
-            await generateStory(formData)
+            const result = await generateStory(formData)
+            if (result && result.storyId) {
+                router.push(`/story/${result.storyId}`)
+            } else {
+                throw new Error('No story ID returned')
+            }
         } catch (error) {
             console.error(error)
             alert('Failed to generate story')

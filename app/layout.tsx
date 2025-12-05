@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description: "Learn Chinese through reading AI-generated stories.",
 };
 
+import Sidebar from "@/components/Sidebar";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -16,9 +18,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className="antialiased bg-retro-bg text-retro-text font-sans min-h-screen"
+        className="antialiased bg-retro-bg text-retro-text font-sans min-h-screen flex"
       >
-        {children}
+        <Sidebar />
+        <main className="flex-1 ml-64 min-h-screen">
+          {children}
+        </main>
       </body>
     </html>
   );

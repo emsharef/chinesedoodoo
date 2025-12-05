@@ -51,6 +51,8 @@ export async function lookupWord(word: string) {
         await supabase.from('chinese_vocab_items').insert({
             user_id: user.id,
             word: word,
+            definition: result.english,
+            pinyin: result.pinyin,
             status: 'learning',
             // Initialize FSRS parameters
             difficulty: 0,

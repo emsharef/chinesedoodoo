@@ -36,6 +36,21 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
             <div className="bg-retro-paper p-8 rounded-xl shadow-lg border border-retro-muted/10 min-h-[60vh]">
                 <Reader segments={segments} storyId={story.id} />
             </div>
+
+            {story.debug_prompt && (
+                <div className="mt-8">
+                    <details className="bg-retro-bg/50 rounded-lg border border-retro-muted/20 overflow-hidden">
+                        <summary className="p-4 cursor-pointer font-mono text-xs text-retro-muted hover:text-retro-text hover:bg-retro-primary/5 transition-colors select-none">
+                            Debug Prompt
+                        </summary>
+                        <div className="p-4 border-t border-retro-muted/20 bg-black/5">
+                            <pre className="whitespace-pre-wrap font-mono text-xs text-retro-text/70 overflow-x-auto">
+                                {story.debug_prompt}
+                            </pre>
+                        </div>
+                    </details>
+                </div>
+            )}
         </div>
     )
 }

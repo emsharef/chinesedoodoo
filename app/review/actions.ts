@@ -21,6 +21,7 @@ export async function getDueCards() {
         .from('chinese_vocab_items')
         .select('*')
         .eq('user_id', user.id)
+        .in('status', ['new', 'learning', 'review', 'relearning'])
         .or(`next_review.lte.${now},next_review.is.null`)
         .limit(20) // Limit session size
 

@@ -16,6 +16,12 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
         .eq('id', id)
         .single()
 
+    const { data: profile } = await supabase
+        .from('chinese_profiles')
+        .select('font_size')
+        .eq('id', user.id)
+        .single()
+
     if (!story) notFound()
 
     // Server-side segmentation
@@ -34,7 +40,7 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
             </div>
 
             <div className="bg-retro-paper p-8 rounded-xl shadow-lg border border-retro-muted/10 min-h-[60vh]">
-                <Reader segments={segments} storyId={story.id} />
+                <Reader segments={segments} storyId={story.id} fontSize={profile?.font_size || 'medium'} />
             </div>
 
             {story.debug_prompt && (

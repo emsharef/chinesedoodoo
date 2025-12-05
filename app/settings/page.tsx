@@ -4,6 +4,7 @@ import { signout } from '@/app/login/actions'
 import { LogOut, User, Lock, AlertTriangle, Code } from 'lucide-react'
 import ResetAccountButton from './ResetAccountButton'
 import DebugModeToggle from './DebugModeToggle'
+import AppearanceSettings from './AppearanceSettings'
 
 export default async function SettingsPage() {
     const supabase = await createClient()
@@ -16,7 +17,7 @@ export default async function SettingsPage() {
 
     const { data: profile } = await supabase
         .from('chinese_profiles')
-        .select('debug_mode')
+        .select('debug_mode, font_size, theme')
         .eq('id', user.id)
         .single()
 
@@ -77,6 +78,12 @@ export default async function SettingsPage() {
                         </button>
                     </form>
                 </div>
+
+                {/* Appearance Settings */}
+                <AppearanceSettings
+                    initialFontSize={profile?.font_size || 'medium'}
+                    initialTheme={profile?.theme || 'dark'}
+                />
 
                 {/* Developer Settings */}
                 <div className="p-6 border-b border-retro-muted/10 bg-retro-bg/30">

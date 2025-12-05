@@ -7,15 +7,22 @@ import { lookupWord } from '@/app/actions/lookup'
 interface ReaderProps {
     segments: string[]
     storyId: string
+    fontSize?: string
 }
 
 import { pinyin } from 'pinyin-pro'
 
-export default function Reader({ segments, storyId }: ReaderProps) {
+export default function Reader({ segments, storyId, fontSize = 'medium' }: ReaderProps) {
     const [selectedWord, setSelectedWord] = useState<string | null>(null)
     const [definition, setDefinition] = useState<any | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [showPinyin, setShowPinyin] = useState(false)
+
+    const fontSizeClass = {
+        small: 'text-lg',
+        medium: 'text-xl',
+        large: 'text-2xl'
+    }[fontSize] || 'text-xl'
 
     async function handleWordClick(word: string) {
         // Ignore punctuation/spaces if possible, but for now just allow clicking everything
@@ -66,7 +73,7 @@ export default function Reader({ segments, storyId }: ReaderProps) {
             </div>
 
             {/* Text Area */}
-            <div className="prose prose-invert prose-lg max-w-none text-xl leading-loose tracking-wide font-serif mb-12">
+            <div className={`prose prose-invert prose-lg max-w-none ${fontSizeClass} leading-loose tracking-wide font-serif mb-12`}>
                 <p className="flex flex-wrap gap-x-1 gap-y-4 items-end">
                     {segments.map((word, index) => (
                         <span

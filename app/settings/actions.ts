@@ -73,3 +73,27 @@ export async function toggleDebugMode(enabled: boolean) {
     revalidatePath('/settings')
     return { success: true }
 }
+
+export async function updateAppearance(updates: { font_size?: string, theme?: string }) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error('Unauthorized')
+
+    const { error } = await supabase
+        .from('chinese_profiles')
+        .upsert({
+            id: user.id,
+            ...updates
+        }, { onConflict: 'id' })
+
+    if (error) {
+        console.error('Error updating appearance:', error)
+        throw new Error('Failed to update settings')
+    }
+
+    revalidatePath('/')
+    revalidatePath('/settings')
+    revalidatePath('/story/[id]', 'page')
+    return { success: true }
+}

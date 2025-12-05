@@ -26,7 +26,7 @@ export default function Sidebar() {
     ]
 
     return (
-        <aside className="w-64 bg-retro-paper border-r border-retro-muted/20 h-screen fixed left-0 top-0 flex flex-col p-6 z-40">
+        <aside className="hidden md:flex w-64 bg-retro-paper border-r border-retro-muted/20 h-screen fixed left-0 top-0 flex-col p-6 z-40">
             <div className="mb-10">
                 <h1 className={`${logoFont.className} text-4xl text-retro-primary tracking-wider`}>
                     中文读读

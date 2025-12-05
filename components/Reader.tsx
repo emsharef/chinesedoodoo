@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { Volume2, Smile, ThumbsUp, Dumbbell } from 'lucide-react'
-import { Segment, useSegmentit } from 'segmentit'
 import { lookupWord } from '@/app/actions/lookup'
 
 interface ReaderProps {

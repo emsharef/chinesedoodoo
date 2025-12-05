@@ -12,17 +12,18 @@ interface ReaderProps {
 
 import { pinyin } from 'pinyin-pro'
 
+const FONT_SIZES: Record<string, string> = {
+    small: 'text-lg',
+    medium: 'text-xl',
+    large: 'text-2xl',
+    xl: 'text-3xl'
+}
+
 export default function Reader({ segments, storyId, fontSize = 'medium' }: ReaderProps) {
     const [selectedWord, setSelectedWord] = useState<string | null>(null)
     const [definition, setDefinition] = useState<any | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [showPinyin, setShowPinyin] = useState(false)
-
-    const fontSizeClass = {
-        small: 'text-lg',
-        medium: 'text-xl',
-        large: 'text-2xl'
-    }[fontSize] || 'text-xl'
 
     async function handleWordClick(word: string) {
         // Ignore punctuation/spaces if possible, but for now just allow clicking everything
@@ -73,7 +74,7 @@ export default function Reader({ segments, storyId, fontSize = 'medium' }: Reade
             </div>
 
             {/* Text Area */}
-            <div className={`prose prose-invert prose-lg max-w-none ${fontSizeClass} leading-loose tracking-wide font-serif mb-12`}>
+            <div className={`prose prose-invert prose-lg max-w-none ${FONT_SIZES[fontSize]} leading-loose tracking-wide font-serif mb-12`}>
                 <p className="flex flex-wrap gap-x-1 gap-y-4 items-end">
                     {segments.map((word, index) => (
                         <span

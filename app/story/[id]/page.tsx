@@ -10,16 +10,16 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) redirect('/login')
 
+    const { data: profile } = await supabase
+        .from('chinese_profiles')
+        .select('font_size, debug_mode')
+        .eq('id', user.id)
+        .single()
+
     const { data: story } = await supabase
         .from('chinese_stories')
         .select('*')
         .eq('id', id)
-        .single()
-
-    const { data: profile } = await supabase
-        .from('chinese_profiles')
-        .select('font_size')
-        .eq('id', user.id)
         .single()
 
     if (!story) notFound()

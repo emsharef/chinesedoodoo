@@ -12,30 +12,15 @@ import Sidebar from "@/components/Sidebar";
 import BottomNav from "@/components/BottomNav";
 import MobileHeader from "@/components/MobileHeader";
 
-import { createClient } from '@/utils/supabase/server'
-
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  let theme = 'dark'
-  if (user) {
-    const { data: profile } = await supabase
-      .from('chinese_profiles')
-      .select('theme')
-      .eq('id', user.id)
-      .single()
-    if (profile?.theme) theme = profile.theme
-  }
-
   return (
     <html lang="en">
       <body
-        className={`antialiased bg-retro-bg text-retro-text font-sans min-h-screen flex flex-col md:flex-row ${theme === 'light' ? 'light-theme' : ''}`}
+        className="antialiased bg-retro-bg text-retro-text font-sans min-h-screen flex flex-col md:flex-row"
       >
         <MobileHeader />
         <Sidebar />

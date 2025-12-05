@@ -33,11 +33,10 @@ async function migrate() {
 
         await client.query(`
       ALTER TABLE public.chinese_profiles 
-      ADD COLUMN IF NOT EXISTS font_size TEXT DEFAULT 'medium',
-      ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'dark';
+      ADD COLUMN IF NOT EXISTS font_size TEXT DEFAULT 'medium';
     `);
 
-        console.log('Columns font_size and theme added successfully');
+        console.log('Column font_size added successfully');
 
     } catch (err) {
         console.error('Error running migration:', err);

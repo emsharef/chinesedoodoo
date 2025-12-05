@@ -11,11 +11,25 @@ export default async function Dashboard() {
   if (!user) {
     redirect('/login')
   }
+  const { data: profile } = await supabase
+    .from('chinese_profiles')
+    .select('font_size')
+    .eq('id', user.id)
+    .single()
 
   const { data: stories } = await supabase
     .from('chinese_stories')
     .select('*')
     .order('created_at', { ascending: false })
+
+  const FONT_SIZES: Record<string, { title: string, content: string }> = {
+    small: { title: 'text-lg', content: 'text-xs' },
+    medium: { title: 'text-xl', content: 'text-sm' },
+    large: { title: 'text-2xl', content: 'text-base' },
+    xl: { title: 'text-3xl', content: 'text-lg' }
+  }
+
+  const currentSize = FONT_SIZES[profile?.font_size || 'medium']
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -67,10 +81,10 @@ export default async function Dashboard() {
                 )}
               </div>
             </div>
-            <h2 className="text-xl font-bold text-retro-text group-hover:text-retro-primary transition-colors mb-2">
+            <h2 className={`${currentSize.title} font-bold text-retro-text group-hover:text-retro-primary transition-colors mb-2`}>
               {story.title}
             </h2>
-            <p className="text-retro-muted line-clamp-3 text-sm">
+            <p className={`text-retro-muted line-clamp-3 ${currentSize.content}`}>
               {story.content.substring(0, 100)}...
             </p>
             <div className="mt-4 text-xs text-retro-muted flex justify-between items-center">

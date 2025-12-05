@@ -74,7 +74,7 @@ export async function toggleDebugMode(enabled: boolean) {
     return { success: true }
 }
 
-export async function updateAppearance(updates: { font_size?: string, theme?: string }) {
+export async function updateFontSize(size: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -84,16 +84,16 @@ export async function updateAppearance(updates: { font_size?: string, theme?: st
         .from('chinese_profiles')
         .upsert({
             id: user.id,
-            ...updates
+            font_size: size
         }, { onConflict: 'id' })
 
     if (error) {
-        console.error('Error updating appearance:', error)
+        console.error('Error updating font size:', error)
         throw new Error('Failed to update settings')
     }
 
     revalidatePath('/')
     revalidatePath('/settings')
-    revalidatePath('/story/[id]', 'page')
+    revalidatePath('/story/[id]')
     return { success: true }
 }

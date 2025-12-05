@@ -2,6 +2,7 @@
 
 import { generateStory } from '@/app/actions'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Loader2, Shuffle, Sparkles } from 'lucide-react'
 
 const GENRES = [
@@ -62,11 +63,21 @@ export default function NewStoryPage() {
         }
     }, [genre, currentThemes, currentSettings, theme, setting])
 
+    const router = useRouter()
+
     async function handleSubmit(formData: FormData) {
         setIsLoading(true)
         try {
-            await generateStory(formData)
-        } finally {
+            const result = await generateStory(formData)
+            if (result.success && result.storyId) {
+                router.push(`/story/${result.storyId}`)
+                // Don't set isLoading(false) here, let it spin until the page changes
+            } else {
+                throw new Error('Failed to generate story')
+            }
+        } catch (error) {
+            console.error(error)
+            alert('Something went wrong. Please try again.')
             setIsLoading(false)
         }
     }

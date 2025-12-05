@@ -1,43 +1,26 @@
 @import "tailwindcss";
 
-:root {
-  /* Default Dark Theme */
-  --retro-bg: #1a1b26;
-  --retro-paper: #24283b;
-  --retro-primary: #7aa2f7;
-  --retro-secondary: #bb9af7;
-  --retro-accent: #ff9e64;
-  --retro-text: #c0caf5;
-  --retro-muted: #565f89;
-
-  --background: #1a1b26;
-  --foreground: #c0caf5;
+@theme {
+  --color-retro-bg: #1a1b26;
+  --color-retro-paper: #24283b;
+  --color-retro-primary: #7aa2f7;
+  --color-retro-secondary: #bb9af7;
+  --color-retro-accent: #ff9e64;
+  --color-retro-text: #c0caf5;
+  --color-retro-muted: #565f89;
 
   --font-serif: "Noto Serif SC", serif;
   --font-sans: "Inter", sans-serif;
 }
 
-.light-theme {
-  /* Light Theme */
-  --retro-bg: #f0f2f5;
-  --retro-paper: #ffffff;
-  --retro-primary: #3b82f6;
-  --retro-secondary: #8b5cf6;
-  --retro-accent: #f97316;
-  --retro-text: #1f2937;
-  --retro-muted: #9ca3af;
-
-  --background: #f0f2f5;
-  --foreground: #1f2937;
+:root {
+  --background: #1a1b26;
+  --foreground: #c0caf5;
 }
 
 @layer base {
   body {
-    background-color: var(--retro-bg);
-    color: var(--retro-text);
-    font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    @apply bg-retro-bg text-retro-text font-sans antialiased;
   }
 
   h1,
@@ -46,9 +29,7 @@
   h4,
   h5,
   h6 {
-    font-family: var(--font-serif);
-    font-weight: 700;
-    letter-spacing: -0.025em;
+    @apply font-serif font-bold tracking-tight;
   }
 }
 
@@ -58,10 +39,9 @@
 }
 
 ::-webkit-scrollbar-track {
-  background-color: var(--retro-bg);
+  @apply bg-retro-bg;
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: var(--retro-muted);
-  border-radius: 9999px;
+  @apply bg-retro-muted rounded-full;
 }

@@ -1,10 +1,10 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { signout } from '@/app/login/actions'
-import { LogOut, User, Lock, AlertTriangle, Code } from 'lucide-react'
+import { LogOut, User, Lock, AlertTriangle, Code, Type } from 'lucide-react'
 import ResetAccountButton from './ResetAccountButton'
 import DebugModeToggle from './DebugModeToggle'
-import AppearanceSettings from './AppearanceSettings'
+import FontSizeSelector from './FontSizeSelector'
 
 export default async function SettingsPage() {
     const supabase = await createClient()
@@ -17,7 +17,7 @@ export default async function SettingsPage() {
 
     const { data: profile } = await supabase
         .from('chinese_profiles')
-        .select('debug_mode, font_size, theme')
+        .select('debug_mode, font_size')
         .eq('id', user.id)
         .single()
 
@@ -80,10 +80,18 @@ export default async function SettingsPage() {
                 </div>
 
                 {/* Appearance Settings */}
-                <AppearanceSettings
-                    initialFontSize={profile?.font_size || 'medium'}
-                    initialTheme={profile?.theme || 'dark'}
-                />
+                <div className="p-6 border-b border-retro-muted/10 bg-retro-bg/30">
+                    <h2 className="text-xl font-semibold text-retro-text mb-4 flex items-center gap-2">
+                        <Type size={20} />
+                        Appearance
+                    </h2>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-retro-text mb-2">Font Size</label>
+                            <FontSizeSelector initialValue={profile?.font_size || 'medium'} />
+                        </div>
+                    </div>
+                </div>
 
                 {/* Developer Settings */}
                 <div className="p-6 border-b border-retro-muted/10 bg-retro-bg/30">

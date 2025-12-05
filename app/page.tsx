@@ -13,13 +13,17 @@ export default async function Dashboard() {
   }
   const { data: profile } = await supabase
     .from('chinese_profiles')
-    .select('font_size')
+    .select('font_size, target_language')
     .eq('id', user.id)
     .single()
+
+  const targetLang = profile?.target_language || 'zh-CN'
 
   const { data: stories } = await supabase
     .from('chinese_stories')
     .select('*')
+    .eq('user_id', user.id)
+    .eq('language', targetLang)
     .order('created_at', { ascending: false })
 
   const FONT_SIZES: Record<string, { title: string, content: string }> = {

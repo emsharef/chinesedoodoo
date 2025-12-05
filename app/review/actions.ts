@@ -6,7 +6,7 @@ import { lookupWord } from '@/app/actions/lookup'
 
 const fsrs = new FSRS()
 
-export async function getDueCards() {
+export async function getDueCards(language: string = 'zh-CN') {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return []
@@ -21,6 +21,7 @@ export async function getDueCards() {
         .from('chinese_vocab_items')
         .select('*')
         .eq('user_id', user.id)
+        .eq('language', language)
         .in('status', ['new', 'learning', 'review', 'relearning'])
         .or(`next_review.lte.${now},next_review.is.null`)
         .limit(20) // Limit session size

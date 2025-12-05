@@ -7,63 +7,59 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 })
 
-export async function lookupWord(word: string) {
+export async function lookupWord(word: string, language: string = 'zh-CN') {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) return null
+    if (!user) throw new Error('Not authenticated')
 
-    // 1. Check if word exists in vocab_items (to see if we already have data, though we store definition in a separate dictionary table ideally, but for now we just return dynamic data)
-    // Actually, we should check if we have a cached definition. 
-    // For this MVP, we'll just ask OpenAI every time or cache it in a simple way? 
-    // Let's ask OpenAI for now.
+    // Check if word exists in vocab
+    const { data: existing } = await supabase
+        .from('chinese_vocab_items')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('word', word)
+        .eq('language', language)
+        .single()
 
-    const prompt = `
-    Provide the Pinyin and English definition for the Chinese word: "${word}".
-    Output JSON format:
-    {
-      "pinyin": "pinyin with tone marks",
-      "english": "concise english definition"
+    if (existing?.definition) {
+        return {
+            pinyin: existing.pinyin,
+            english: existing.definition,
+            isNew: false
+        }
     }
-  `
+
+    // If not, ask OpenAI
+    const isChinese = language === 'zh-CN' || language === 'zh-TW'
+    const pronunciationInstruction = isChinese
+        ? "pinyin with tone marks"
+        : "phonetic pronunciation (IPA or standard transcription)"
+
+    const prompt = `Define the word "${word}" (Language: ${language}).
+    Output JSON: { "pinyin": "${pronunciationInstruction}", "english": "concise english definition" }`
 
     const completion = await openai.chat.completions.create({
         messages: [{ role: 'user', content: prompt }],
-        model: 'gpt-4o-mini', // Use mini for speed/cost
+        model: 'gpt-4o-mini',
         response_format: { type: 'json_object' },
     })
 
     const result = JSON.parse(completion.choices[0].message.content || '{}')
 
-    // 2. Add to vocab_items as "learning" if not exists
-    // We use upsert to update last_review or status if needed, but primarily to ensure it's tracked.
-    // If it's the first time clicking, it's "new" or "learning".
-
-    const { data: existing } = await supabase
-        .from('chinese_vocab_items')
-        .select('status')
-        .eq('user_id', user.id)
-        .eq('word', word)
-        .single()
-
-    let isNew = false
-    if (!existing) {
-        await supabase.from('chinese_vocab_items').insert({
-            user_id: user.id,
-            word: word,
-            definition: result.english,
-            pinyin: result.pinyin,
-            status: 'learning',
-            // Initialize FSRS parameters
-            difficulty: 0,
-            stability: 0,
-            retrievability: 0,
-        })
-        isNew = true
-    }
+    // Save to vocab (status: learning)
+    await supabase.from('chinese_vocab_items').upsert({
+        user_id: user.id,
+        word,
+        pinyin: result.pinyin,
+        definition: result.english,
+        language: language,
+        status: 'learning',
+        next_review: new Date().toISOString()
+    }, { onConflict: 'user_id, word' }) // Note: Using existing constraint for now
 
     return {
         ...result,
-        isNew,
+        isNew: true
     }
 }

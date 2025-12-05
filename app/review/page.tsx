@@ -5,6 +5,8 @@ import { getDueCards, submitReview } from './actions'
 import { lookupWord } from '@/app/actions/lookup'
 import { Loader2 } from 'lucide-react'
 
+import { createClient } from '@/utils/supabase/client'
+
 export default function ReviewPage() {
     const [queue, setQueue] = useState<any[]>([])
     const [currentItem, setCurrentItem] = useState<any | null>(null)
@@ -12,25 +14,41 @@ export default function ReviewPage() {
     const [definition, setDefinition] = useState<any | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [language, setLanguage] = useState<string>('zh-CN')
 
     useEffect(() => {
-        loadQueue()
+        const fetchLanguageAndQueue = async () => {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) {
+                const { data: profile } = await supabase
+                    .from('chinese_profiles')
+                    .select('target_language')
+                    .eq('id', user.id)
+                    .single()
+
+                const lang = profile?.target_language || 'zh-CN'
+                setLanguage(lang)
+                loadQueue(lang)
+            }
+        }
+        fetchLanguageAndQueue()
     }, [])
 
-    async function loadQueue() {
+    async function loadQueue(lang: string) {
         setIsLoading(true)
-        const items = await getDueCards()
+        const items = await getDueCards(lang)
         setQueue(items)
         if (items.length > 0) {
             setCurrentItem(items[0])
             // Prefetch definition
-            fetchDefinition(items[0].word)
+            fetchDefinition(items[0].word, lang)
         }
         setIsLoading(false)
     }
 
-    async function fetchDefinition(word: string) {
-        const def = await lookupWord(word)
+    async function fetchDefinition(word: string, lang: string) {
+        const def = await lookupWord(word, lang)
         setDefinition(def)
     }
 
@@ -49,7 +67,7 @@ export default function ReviewPage() {
 
             if (nextQueue.length > 0) {
                 setCurrentItem(nextQueue[0])
-                fetchDefinition(nextQueue[0].word)
+                fetchDefinition(nextQueue[0].word, language)
             } else {
                 setCurrentItem(null)
             }

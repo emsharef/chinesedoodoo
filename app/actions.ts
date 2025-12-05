@@ -30,21 +30,40 @@ export async function generateStory(formData: FormData) {
     }
 
     // 1. Fetch User Stats & History
-    // Check vocab size
+    const { data: profile } = await supabase
+        .from('chinese_profiles')
+        .select('debug_mode, target_language')
+        .eq('id', user.id)
+        .single()
+
+    const targetLang = profile?.target_language || 'zh-CN'
+    const isChinese = targetLang === 'zh-CN' || targetLang === 'zh-TW'
+    const langNameMap: Record<string, string> = {
+        'zh-CN': 'Chinese (Simplified)',
+        'zh-TW': 'Chinese (Traditional)',
+        'de': 'German',
+        'it': 'Italian',
+        'es': 'Spanish'
+    }
+    const targetLangName = langNameMap[targetLang]
+
+    // Check vocab size (filtered by language)
     const { count: vocabCount } = await supabase
         .from('chinese_vocab_items')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('status', 'known')
+        .eq('language', targetLang)
 
     const isNewUser = (vocabCount || 0) < 20
 
-    // Fetch last 3 read stories with ratings
+    // Fetch last 3 read stories with ratings (filtered by language)
     const { data: recentStories } = await supabase
         .from('chinese_stories')
         .select('title, content, difficulty_rating')
         .eq('user_id', user.id)
         .eq('is_read', true)
+        .eq('language', targetLang)
         .order('read_at', { ascending: false })
         .limit(3)
 
@@ -53,6 +72,7 @@ export async function generateStory(formData: FormData) {
         .from('chinese_vocab_items')
         .select('word')
         .eq('user_id', user.id)
+        .eq('language', targetLang)
         .lt('stability', 0.5)
         .limit(20)
 
@@ -65,6 +85,7 @@ export async function generateStory(formData: FormData) {
             .from('chinese_vocab_items')
             .select('word')
             .eq('user_id', user.id)
+            .eq('language', targetLang)
             .neq('status', 'known')
 
         if (learningWords) {
@@ -77,19 +98,20 @@ export async function generateStory(formData: FormData) {
     }
 
     // 2. Construct Prompt
-    let systemPrompt = `You are an expert Chinese language teacher writing content for a student.`
-    let userPrompt = `Write a short story or article in Chinese (Simplified).
+    let systemPrompt = `You are an expert language teacher writing content for a student learning ${targetLangName}.`
+    let userPrompt = `Write a short story or article in ${targetLangName}.
     
     Parameters:
     - Genre: ${genre}
     - Topic: ${theme}
     - Setting: ${setting}
-    - Target Length: Approximately ${targetLength} characters.
+    - Target Length: Approximately ${targetLength} characters/words.
     `
 
     if (isNewUser) {
+        const level = isChinese ? 'HSK 1 (Beginner)' : 'CEFR A1 (Beginner)'
         userPrompt += `
-        Target Level: HSK 1 (Beginner).
+        Target Level: ${level}.
         Constraint: Use very simple sentences and basic vocabulary.
         New Words: Introduce a few simple words suitable for a beginner.
         `
@@ -115,7 +137,7 @@ export async function generateStory(formData: FormData) {
         - If recent stories were rated 'Easy', INCREASE the difficulty: Use more precise vocabulary, less frequent words, and slightly more complex sentence structures.
         - If recent stories were rated 'Hard', DECREASE the difficulty: Use high-frequency words, simple S-V-O sentences, and high repetition.
         - If rated 'Good', maintain the current level but introduce new topics.
-        - Do NOT rely on generic HSK levels. Calibrate specifically to this user's demonstrated ability and feedback.
+        - Do NOT rely on generic levels. Calibrate specifically to this user's demonstrated ability and feedback.
 
         Vocabulary Strategy:
         1. Base Vocabulary: Use words the user likely knows based on the text above.
@@ -130,9 +152,9 @@ export async function generateStory(formData: FormData) {
     userPrompt += `
     Output JSON format:
     {
-      "title": "Story Title in Chinese",
-      "content": "The full story text in Chinese",
-      "estimated_hsk_level": 1 // integer 1-6
+      "title": "Story Title in ${targetLangName}",
+      "content": "The full story text in ${targetLangName}",
+      "estimated_level": 1 // integer 1-6 (HSK) or 1-6 (A1=1, A2=2, B1=3, B2=4, C1=5, C2=6)
     }
     `
 
@@ -151,20 +173,14 @@ export async function generateStory(formData: FormData) {
         throw new Error('Failed to generate story')
     }
 
-    // Check debug mode
-    const { data: profile } = await supabase
-        .from('chinese_profiles')
-        .select('debug_mode')
-        .eq('id', user.id)
-        .single()
-
     const { data: story, error } = await supabase
         .from('chinese_stories')
         .insert({
             user_id: user.id,
             title: result.title,
             content: result.content,
-            difficulty_level: result.estimated_hsk_level || 1,
+            difficulty_level: result.estimated_level || 1,
+            language: targetLang,
             debug_prompt: profile?.debug_mode ? `${systemPrompt}\n\n---\n\n${userPrompt}` : null
         })
         .select()

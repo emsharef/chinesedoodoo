@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { pinyin } from 'pinyin-pro'
 import { Trash2, Loader2 } from 'lucide-react'
-import { deleteVocabularyItem } from './actions'
+import { getVocabulary, deleteVocabularyItem } from './actions'
 
 interface VocabItem {
     id: string
@@ -21,12 +21,30 @@ interface VocabItem {
 type SortField = 'word' | 'status' | 'difficulty' | 'next_review' | 'created_at'
 type SortOrder = 'asc' | 'desc'
 
-export default function VocabularyList({ items }: { items: VocabItem[] }) {
+export default function VocabularyList({ language }: { language: string }) {
+    const [vocab, setVocab] = useState<VocabItem[]>([])
+    const [isLoading, setIsLoading] = useState(true)
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [sortField, setSortField] = useState<SortField>('created_at')
     const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
 
-    const sortedItems = [...items].sort((a, b) => {
+    useEffect(() => {
+        loadVocab()
+    }, [language])
+
+    async function loadVocab() {
+        setIsLoading(true)
+        try {
+            const data = await getVocabulary(language)
+            setVocab(data)
+        } catch (error) {
+            console.error(error)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const sortedItems = [...vocab].sort((a, b) => {
         const order = sortOrder === 'asc' ? 1 : -1
 
         switch (sortField) {
@@ -73,7 +91,7 @@ export default function VocabularyList({ items }: { items: VocabItem[] }) {
         }
     }
 
-    if (items.length === 0) {
+    if (!isLoading && vocab.length === 0) {
         return (
             <div className="text-center py-12 border-2 border-dashed border-retro-muted/20 rounded-xl bg-retro-paper">
                 <p className="text-retro-muted">No vocabulary words yet. Read some stories to add words!</p>

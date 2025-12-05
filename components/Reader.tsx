@@ -8,6 +8,7 @@ interface ReaderProps {
     segments: string[]
     storyId: string
     fontSize?: string
+    language?: string
 }
 
 import { pinyin } from 'pinyin-pro'
@@ -19,11 +20,13 @@ const FONT_SIZES: Record<string, string> = {
     xl: 'text-3xl'
 }
 
-export default function Reader({ segments, storyId, fontSize = 'medium' }: ReaderProps) {
+export default function Reader({ segments, storyId, fontSize = 'medium', language = 'zh-CN' }: ReaderProps) {
     const [selectedWord, setSelectedWord] = useState<string | null>(null)
     const [definition, setDefinition] = useState<any | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [showPinyin, setShowPinyin] = useState(false)
+
+    const isChinese = language === 'zh-CN' || language === 'zh-TW'
 
     async function handleWordClick(word: string) {
         // Ignore punctuation/spaces if possible, but for now just allow clicking everything
@@ -34,7 +37,7 @@ export default function Reader({ segments, storyId, fontSize = 'medium' }: Reade
         setDefinition(null)
 
         try {
-            const result = await lookupWord(word)
+            const result = await lookupWord(word, language)
             setDefinition(result)
         } catch (error) {
             console.error('Lookup failed', error)
@@ -48,10 +51,16 @@ export default function Reader({ segments, storyId, fontSize = 'medium' }: Reade
         try {
             const { markStoryAsRead } = await import('@/app/actions/complete-story')
 
-            // Extract Chinese words
-            const words = segments.filter(s => /[\u4e00-\u9fa5]/.test(s))
+            // Extract words based on language
+            let words: string[] = []
+            if (isChinese) {
+                words = segments.filter(s => /[\u4e00-\u9fa5]/.test(s))
+            } else {
+                // For other languages, filter out punctuation/spaces
+                words = segments.filter(s => s.trim().length > 0 && !/^[.,!?;:"'()\[\]]+$/.test(s))
+            }
 
-            await markStoryAsRead(storyId, rating, words)
+            await markStoryAsRead(storyId, rating, words, language)
             window.location.href = '/'
         } catch (error) {
             console.error(error)
@@ -63,15 +72,17 @@ export default function Reader({ segments, storyId, fontSize = 'medium' }: Reade
 
     return (
         <div className="relative pb-20">
-            {/* Controls */}
-            <div className="fixed bottom-8 right-8 flex gap-4 z-10">
-                <button
-                    onClick={() => setShowPinyin(!showPinyin)}
-                    className="bg-retro-paper border border-retro-primary text-retro-primary px-4 py-2 rounded-full shadow-lg hover:bg-retro-bg transition-colors"
-                >
-                    {showPinyin ? 'Hide Pinyin' : 'Show Pinyin'}
-                </button>
-            </div>
+            {/* Controls - Only show Pinyin toggle for Chinese */}
+            {isChinese && (
+                <div className="fixed bottom-8 right-8 flex gap-4 z-10">
+                    <button
+                        onClick={() => setShowPinyin(!showPinyin)}
+                        className="bg-retro-paper border border-retro-primary text-retro-primary px-4 py-2 rounded-full shadow-lg hover:bg-retro-bg transition-colors"
+                    >
+                        {showPinyin ? 'Hide Pinyin' : 'Show Pinyin'}
+                    </button>
+                </div>
+            )}
 
             {/* Text Area */}
             <div className={`prose prose-invert prose-lg max-w-none ${FONT_SIZES[fontSize]} leading-loose tracking-wide font-serif mb-12`}>
@@ -85,8 +96,8 @@ export default function Reader({ segments, storyId, fontSize = 'medium' }: Reade
                 ${selectedWord === word ? 'bg-retro-primary/30 text-retro-primary' : ''}
               `}
                         >
-                            {/* Pinyin Display */}
-                            {(showPinyin || (selectedWord === word && definition?.pinyin)) && (
+                            {/* Pinyin Display - Only for Chinese */}
+                            {isChinese && (showPinyin || (selectedWord === word && definition?.pinyin)) && (
                                 <span className="block text-xs text-retro-muted text-center w-full absolute -top-5 left-0 font-sans whitespace-nowrap overflow-visible">
                                     {selectedWord === word && definition?.pinyin
                                         ? definition.pinyin
@@ -151,7 +162,7 @@ export default function Reader({ segments, storyId, fontSize = 'medium' }: Reade
                                     <div className="text-retro-muted animate-pulse">Loading definition...</div>
                                 ) : definition ? (
                                     <div>
-                                        <p className="text-xl font-mono text-retro-accent mb-1">{definition.pinyin}</p>
+                                        {isChinese && <p className="text-xl font-mono text-retro-accent mb-1">{definition.pinyin}</p>}
                                         <p className="text-lg text-retro-text">{definition.english}</p>
                                     </div>
                                 ) : (

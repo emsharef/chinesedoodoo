@@ -97,3 +97,28 @@ export async function updateFontSize(size: string) {
     revalidatePath('/story/[id]')
     return { success: true }
 }
+
+export async function updateLanguage(lang: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error('Unauthorized')
+
+    const { error } = await supabase
+        .from('chinese_profiles')
+        .upsert({
+            id: user.id,
+            target_language: lang
+        }, { onConflict: 'id' })
+
+    if (error) {
+        console.error('Error updating language:', error)
+        throw new Error('Failed to update settings')
+    }
+
+    revalidatePath('/')
+    revalidatePath('/settings')
+    revalidatePath('/story/new')
+    revalidatePath('/vocabulary')
+    return { success: true }
+}

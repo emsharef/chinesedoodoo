@@ -3,19 +3,20 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export async function getVocabulary() {
+export async function getVocabulary(language: string = 'zh-CN') {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) return []
+    if (!user) throw new Error('Not authenticated')
 
-    const { data: items } = await supabase
+    const { data } = await supabase
         .from('chinese_vocab_items')
         .select('*')
         .eq('user_id', user.id)
-        .order('next_review', { ascending: true })
+        .eq('language', language)
+        .order('created_at', { ascending: false })
 
-    return items || []
+    return data || []
 }
 
 export async function deleteVocabularyItem(id: string) {

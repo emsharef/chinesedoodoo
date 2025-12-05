@@ -127,7 +127,7 @@ export default function Reader({ segments, storyId }: ReaderProps) {
 
             {/* Definition Popover */}
             {selectedWord && (
-                <div className="fixed bottom-0 left-0 right-0 p-6 bg-retro-paper border-t border-retro-primary shadow-2xl z-50 animate-in slide-in-from-bottom-10">
+                <div className="fixed bottom-0 left-0 right-0 p-6 pb-24 md:pb-6 bg-retro-paper border-t border-retro-primary shadow-2xl z-[60] animate-in slide-in-from-bottom-10">
                     <div className="container mx-auto max-w-2xl flex justify-between items-start">
                         <div>
                             <h3 className="text-3xl font-bold text-retro-primary mb-2">{selectedWord}</h3>

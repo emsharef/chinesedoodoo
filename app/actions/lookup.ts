@@ -41,7 +41,7 @@ export async function lookupWord(word: string, language: string = 'zh-CN') {
 
     const completion = await openai.chat.completions.create({
         messages: [{ role: 'user', content: prompt }],
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini',
         response_format: { type: 'json_object' },
     })
 

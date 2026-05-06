@@ -36,7 +36,7 @@ The Postgres database is shared with another app in the same Supabase project. *
 | Provider  | Generation         | Lookup fallback     |
 | --------- | ------------------ | ------------------- |
 | Anthropic | claude-sonnet-4-6  | claude-haiku-4-5    |
-| OpenAI    | gpt-5.4            | gpt-5-mini          |
+| OpenAI    | gpt-5.4            | gpt-5.4-mini          |
 
 - Selected per-user via `chinese_profiles.llm_provider` (`'anthropic' | 'openai'`, default `'anthropic'`).
 - Settings page exposes the choice next to existing preferences.

@@ -67,8 +67,10 @@ export async function POST(req: NextRequest) {
     const targetLength = (isChinese ? CHAR_LENGTH_MAP : WORD_LENGTH_MAP)[lengthKey] ?? (isChinese ? 300 : 200)
     const lengthUnit = isChinese ? 'characters' : 'words'
 
-    // Fetch user vocab + history (filtered by language)
-    const [{ count: knownCount }, { data: learningRows }, { data: recentStories }] = await Promise.all([
+    // Fetch user vocab + history (filtered by language).
+    // Known words: pull up to 200 ordered by recency so we can either dump the
+    // full list (when small) or take the 30 most-recent as a calibration sample.
+    const [{ count: knownCount }, { data: learningRows }, { data: recentStories }, { data: knownRows }] = await Promise.all([
         supabase
             .from('chinese_vocab_items')
             .select('*', { count: 'exact', head: true })
@@ -90,9 +92,22 @@ export async function POST(req: NextRequest) {
             .eq('language', targetLang)
             .order('read_at', { ascending: false })
             .limit(5),
+        supabase
+            .from('chinese_vocab_items')
+            .select('word, last_review')
+            .eq('user_id', user.id)
+            .eq('language', targetLang)
+            .eq('status', 'known')
+            .order('last_review', { ascending: false, nullsFirst: false })
+            .limit(200),
     ])
 
     const learningWords = (learningRows ?? []).map((r) => r.word as string)
+    const knownByRecency = (knownRows ?? []).map((r) => r.word as string)
+    const knownCountVal = knownCount ?? 0
+    // Below 200 known: send the full list (~50–250 tokens). At/above 200: send a
+    // 30-word recency sample as a calibration anchor.
+    const knownWords = knownCountVal < 200 ? knownByRecency : knownByRecency.slice(0, 30)
 
     // Words from recent stories that the user previously got wrong (still in non-known status)
     const unknownWordsInRecent: string[] = []
@@ -109,10 +124,10 @@ export async function POST(req: NextRequest) {
     const calibration = buildCalibrationContext({
         targetLanguage: targetLang,
         targetLanguageName: langName,
-        knownVocabCount: knownCount ?? 0,
+        knownVocabCount: knownCountVal,
+        knownWords,
         learningWords,
         recentStories: (recentStories ?? []) as any,
-        unknownWordsInRecent,
     })
 
     const requestedReviewWords = unknownWordsInRecent.slice(0, 20)

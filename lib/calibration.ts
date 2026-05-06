@@ -17,9 +17,11 @@ interface CalibrationInput {
     targetLanguage: string
     targetLanguageName: string
     knownVocabCount: number
+    // Already ordered by recency (most recent first). Full list when knownVocabCount
+    // is small; a 30-word recency sample when large. Rendering decides the label.
+    knownWords: string[]
     learningWords: string[]
     recentStories: RecentStory[]
-    unknownWordsInRecent: string[]
 }
 
 const RATING_OFFSET: Record<string, number> = {
@@ -81,8 +83,53 @@ export function summarizeUserLevel(stories: RecentStory[]): UserLevelSummary {
     return { level, confidence, storyCount: stories.length }
 }
 
+const HSK_RUBRIC = `LEVEL SCALE (Chinese, HSK 1-6):
+- 1 = HSK 1: ~150 most common chars; basic SVO present-tense; 5-10 chars per sentence
+- 2 = HSK 2: ~300 chars; particles 了/过, simple time expressions, basic questions
+- 3 = HSK 3: ~600 chars; complex sentences, opinions, more connectives
+- 4 = HSK 4: ~1200 chars; abstract topics, opinion + argumentation
+- 5 = HSK 5: ~2500 chars; news/literary register, idioms, sophisticated grammar
+- 6 = HSK 6: ~5000 chars; advanced literary/news, native-level reading`
+
+const CEFR_RUBRIC = `LEVEL SCALE (CEFR A1-C2 mapped to 1-6):
+- 1 = A1: ~500 most common words; present tense; simple SVO; basic personal info
+- 2 = A2: ~1000 words; past tense, daily routines, basic descriptions
+- 3 = B1: ~2000 words; future + conditional; opinions on familiar topics
+- 4 = B2: ~4000 words; complex grammar, abstract topics, argumentation
+- 5 = C1: ~8000 words; idiomatic, nuanced expression, varied registers
+- 6 = C2: full range; literary/professional native-level reading`
+
+function rubricFor(language: string): string {
+    const isChinese = language === 'zh-CN' || language === 'zh-TW'
+    return isChinese ? HSK_RUBRIC : CEFR_RUBRIC
+}
+
+function storyLength(content: string, language: string): number {
+    const isChinese = language === 'zh-CN' || language === 'zh-TW'
+    if (isChinese) {
+        // Count Chinese characters only — punctuation/whitespace don't count
+        return Array.from(content).filter((c) => /[一-鿿]/.test(c)).length
+    }
+    return content.split(/\s+/).filter(Boolean).length
+}
+
+function lengthUnitFor(language: string): string {
+    const isChinese = language === 'zh-CN' || language === 'zh-TW'
+    return isChinese ? 'chars' : 'words'
+}
+
+function excerptOf(content: string, language: string, maxLen = 200): string {
+    const isChinese = language === 'zh-CN' || language === 'zh-TW'
+    if (content.length <= maxLen) return content.trim()
+    if (isChinese) return content.slice(0, maxLen).trim() + '…'
+    // Avoid cutting mid-word in European languages
+    const truncated = content.slice(0, maxLen)
+    const lastSpace = truncated.lastIndexOf(' ')
+    return (lastSpace > maxLen * 0.6 ? truncated.slice(0, lastSpace) : truncated).trim() + '…'
+}
+
 export function buildCalibrationContext(input: CalibrationInput): string {
-    const { knownVocabCount, learningWords, recentStories, unknownWordsInRecent, targetLanguage, targetLanguageName } = input
+    const { knownVocabCount, knownWords, learningWords, recentStories, targetLanguage, targetLanguageName } = input
 
     if (knownVocabCount < 20 && recentStories.length === 0) {
         const isChinese = targetLanguage === 'zh-CN' || targetLanguage === 'zh-TW'
@@ -91,11 +138,15 @@ export function buildCalibrationContext(input: CalibrationInput): string {
 USER PROFILE
 - This is a brand new ${targetLanguageName} learner. Treat as ${level}.
 - Use very simple sentences and basic vocabulary. Introduce a few simple words.
+
+${rubricFor(targetLanguage)}
 `
     }
 
     const inferredLevel = inferLevel(recentStories)
-    const recentSummary = recentStories
+    const lengthUnit = lengthUnitFor(targetLanguage)
+
+    const recentBlocks = recentStories
         .map((s, i) => {
             const rating = (s.difficulty_rating ?? 'unknown').toUpperCase()
             const tapped = s.tapped_word_count
@@ -104,30 +155,45 @@ USER PROFILE
                 tapped !== null && tapped !== undefined && newCount !== null && newCount !== undefined
                     ? ` · tapped ${tapped} of ~${tapped + newCount} unknown`
                     : ''
-            return `  ${i + 1}. "${s.title}" — ${rating} (level ${s.difficulty_level ?? '?'}${tapNote})`
+            const len = storyLength(s.content, targetLanguage)
+            const exc = excerptOf(s.content, targetLanguage, 200)
+            return `  ${i + 1}. "${s.title}" — ${rating} (level ${s.difficulty_level ?? '?'}, ${len} ${lengthUnit})${tapNote}
+     ${exc}`
         })
-        .join('\n')
+        .join('\n\n')
 
-    const learningSample = learningWords.slice(0, 30).join(', ')
-    const unknownSample = unknownWordsInRecent.slice(0, 30).join(', ')
+    const isFullKnownList = knownWords.length > 0 && knownWords.length >= knownVocabCount
+    const knownLine =
+        knownWords.length === 0
+            ? `- Vocabulary known: ${knownVocabCount} words`
+            : isFullKnownList
+                ? `- Vocabulary known (${knownVocabCount} words, all listed): ${knownWords.join(', ')}`
+                : `- Vocabulary known: ${knownVocabCount} words. Most recently encountered (sample of ${knownWords.length}): ${knownWords.join(', ')}`
+
+    const learningLine =
+        learningWords.length === 0
+            ? '- Vocabulary actively learning: 0 words'
+            : `- Vocabulary actively learning: ${learningWords.length} words: ${learningWords.slice(0, 30).join(', ')}`
 
     return `
 USER PROFILE
 - Target language: ${targetLanguageName} (${targetLanguage})
 - Inferred level: ${inferredLevel !== null ? inferredLevel.toFixed(1) : 'unknown'} (recency-weighted, accounts for tap-density)
-- Vocabulary known: ${knownVocabCount} words
-- Vocabulary actively learning: ${learningWords.length} words${learningSample ? `: ${learningSample}` : ''}
+
+${rubricFor(targetLanguage)}
+
+${knownLine}
+${learningLine}
+
 - Recent reading (last ${recentStories.length}, newest first):
-${recentSummary || '  (none)'}
-- Words user did NOT know in recent stories: ${unknownSample || '(none)'}
+${recentBlocks || '  (none)'}
 
 CALIBRATION RULES
-- The recent-reading list is ordered newest-first; the most recent story carries the most weight.
+- The recent-reading list is ordered newest-first; the most recent story carries the most weight. Use the excerpts as concrete anchors for what the user can read at this level.
 - "Tapped" means the user clicked the word for a definition while reading, i.e. they didn't know it.
 - If recent ratings are EASY and tap rates are low (<10%), push slightly above the inferred level.
 - If recent ratings are HARD or tap rates are high (>20%), drop to or below the inferred level.
 - Rating and tap-rate can disagree — trust the tap rate more for objective difficulty.
-- Naturally re-use words from the "actively learning" list and unknown-word list above when they fit the topic — do not force them.
-- If the unknown-word backlog is large (>10), prioritize reviewing those over introducing new words.
+- Naturally re-use words from the "actively learning" list when they fit the topic — do not force them.
 `
 }

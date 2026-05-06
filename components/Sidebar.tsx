@@ -56,8 +56,20 @@ export default function Sidebar() {
                 })}
             </nav>
 
-            <div className="text-xs text-retro-muted text-center mt-auto">
+            <div className="text-xs text-retro-muted text-center mt-auto space-y-1">
                 <p>© 2025 ChineseDuDu</p>
+                <p>
+                    Chinese definitions from{' '}
+                    <a
+                        href="https://www.mdbg.net/chinese/dictionary?page=cc-cedict"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-retro-primary underline-offset-2 hover:underline"
+                    >
+                        CC-CEDICT
+                    </a>
+                    {' '}(CC BY-SA 4.0)
+                </p>
             </div>
         </aside>
     )

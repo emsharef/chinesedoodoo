@@ -35,6 +35,7 @@ ChineseDuDu (中文读读) is a Next.js 16 / React 19 app for learning a target 
 - OpenAI SDK directly. Models: `gpt-5.1` for story generation (`app/actions.ts`), `gpt-5-mini` for word lookup (`app/actions/lookup.ts`).
 - `fsrs.js` for spaced-repetition scheduling of vocab cards.
 - `segmentit` for Chinese word segmentation; `pinyin-pro` for pinyin in the reader. Non-Chinese languages are split with a regex in `app/story/[id]/page.tsx`.
+- **CC-CEDICT** (`lib/dictionary/cedict.ts`, data at `lib/dictionary/data/cedict.json`) — public-domain Chinese-English dictionary, ~125k entries indexed by both simplified and traditional. Loaded into server memory on first use; the lookup chain is **per-user vocab cache → CC-CEDICT (Chinese only) → LLM fallback**. Refresh via `node scripts/sync-cedict.mjs` (writes the JSON). Licensed CC BY-SA 4.0; attribution shown in the sidebar footer.
 - Tailwind v4 with a custom `retro-*` color palette in `tailwind.config.ts` (`retro-bg`, `retro-paper`, `retro-primary`, etc.). Use these tokens — components don't use raw hex colors.
 - Path alias `@/*` → repo root.
 

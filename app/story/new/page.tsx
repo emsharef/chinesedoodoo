@@ -19,10 +19,22 @@ const FICTION_SETTINGS = ['A futuristic city', 'An ancient village', 'A space st
 const NON_FICTION_SETTINGS = ['Wall Street', 'Silicon Valley', 'Beijing', 'The United Nations', 'A Research Lab', 'A Museum', 'A Tech Conference', 'The Stock Exchange', 'A University', 'A Government Building']
 
 const LENGTH_OPTIONS = [
-    { label: 'Short', value: 'short' },
-    { label: 'Medium', value: 'medium' },
-    { label: 'Long', value: 'long' },
+    { label: 'Short', value: 'short', chineseChars: 100, words: 60 },
+    { label: 'Medium', value: 'medium', chineseChars: 300, words: 200 },
+    { label: 'Long', value: 'long', chineseChars: 600, words: 400 },
 ]
+
+const HSK_LEVELS = [1, 2, 3, 4, 5, 6]
+const CEFR_LABELS = ['', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2']
+
+function levelOptions(language: string): { value: string; label: string }[] {
+    const isChinese = language === 'zh-CN' || language === 'zh-TW'
+    const opts = [{ value: 'auto', label: 'Auto' }]
+    for (const n of HSK_LEVELS) {
+        opts.push({ value: String(n), label: isChinese ? `HSK ${n}` : CEFR_LABELS[n] })
+    }
+    return opts
+}
 
 const STORAGE_KEY = 'chinesedoodoo:newStorySelection'
 
@@ -33,6 +45,7 @@ export default function NewStoryPage() {
     const [theme, setTheme] = useState(FICTION_THEMES[0])
     const [setting, setSetting] = useState(FICTION_SETTINGS[0])
     const [length, setLength] = useState(LENGTH_OPTIONS[1].value)
+    const [targetLevel, setTargetLevel] = useState<string>('auto')
     const [freeText, setFreeText] = useState('')
 
     // Streaming preview state
@@ -81,6 +94,7 @@ export default function NewStoryPage() {
                 if (parsed.theme && themes.includes(parsed.theme)) setTheme(parsed.theme)
                 if (parsed.setting && settings.includes(parsed.setting)) setSetting(parsed.setting)
                 if (parsed.length && LENGTH_OPTIONS.find((l) => l.value === parsed.length)) setLength(parsed.length)
+                if (typeof parsed.targetLevel === 'string') setTargetLevel(parsed.targetLevel)
                 if (typeof parsed.freeText === 'string') setFreeText(parsed.freeText)
             } else {
                 randomize()
@@ -105,7 +119,7 @@ export default function NewStoryPage() {
 
     function persistSelection() {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ genre, theme, setting, length, freeText }))
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ genre, theme, setting, length, targetLevel, freeText }))
         } catch {
             // ignore
         }
@@ -122,7 +136,14 @@ export default function NewStoryPage() {
             const response = await fetch('/api/stories/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ genre, theme, setting, length, freeText: freeText.trim() || undefined }),
+                body: JSON.stringify({
+                    genre,
+                    theme,
+                    setting,
+                    length,
+                    targetLevel: targetLevel === 'auto' ? undefined : Number(targetLevel),
+                    freeText: freeText.trim() || undefined,
+                }),
             })
             if (!response.ok || !response.body) {
                 throw new Error(`Server returned ${response.status}`)
@@ -175,6 +196,15 @@ export default function NewStoryPage() {
     }
 
     const isStreaming = isLoading && (streamTitle || streamContent)
+
+    const targetLang = levelInfo?.targetLanguage ?? 'zh-CN'
+    const isChineseLang = targetLang === 'zh-CN' || targetLang === 'zh-TW'
+    const lengthHint = (() => {
+        const opt = LENGTH_OPTIONS.find((l) => l.value === length)
+        if (!opt) return ''
+        return isChineseLang ? `~${opt.chineseChars} chars` : `~${opt.words} words`
+    })()
+    const levelOpts = levelOptions(targetLang)
 
     return (
         <div className="container mx-auto px-4 py-8 max-w-3xl">
@@ -242,6 +272,19 @@ export default function NewStoryPage() {
                                     className="appearance-none bg-retro-primary/10 border-b-2 border-retro-primary text-retro-primary font-bold px-3 py-1 pr-8 rounded-t hover:bg-retro-primary/20 transition-colors cursor-pointer focus:outline-none disabled:opacity-50"
                                 >
                                     {LENGTH_OPTIONS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+                                </select>
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-retro-primary pointer-events-none text-sm">▼</span>
+                            </span>
+                            <span className="text-retro-muted text-base ml-1">({lengthHint})</span>
+                            {' '}at level
+                            <span className="inline-block mx-2 relative">
+                                <select
+                                    value={targetLevel}
+                                    onChange={(e) => setTargetLevel(e.target.value)}
+                                    disabled={isLoading}
+                                    className="appearance-none bg-retro-primary/10 border-b-2 border-retro-primary text-retro-primary font-bold px-3 py-1 pr-8 rounded-t hover:bg-retro-primary/20 transition-colors cursor-pointer focus:outline-none disabled:opacity-50"
+                                >
+                                    {levelOpts.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
                                 </select>
                                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-retro-primary pointer-events-none text-sm">▼</span>
                             </span>.

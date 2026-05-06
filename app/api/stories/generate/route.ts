@@ -31,6 +31,7 @@ interface RequestBody {
     theme?: string
     setting?: string
     length?: string
+    targetLevel?: number
     freeText?: string
 }
 
@@ -121,6 +122,11 @@ export async function POST(req: NextRequest) {
         }
     }
 
+    const manualLevel =
+        typeof body.targetLevel === 'number' && body.targetLevel >= 1 && body.targetLevel <= 6
+            ? Math.round(body.targetLevel)
+            : undefined
+
     const calibration = buildCalibrationContext({
         targetLanguage: targetLang,
         targetLanguageName: langName,
@@ -128,6 +134,7 @@ export async function POST(req: NextRequest) {
         knownWords,
         learningWords,
         recentStories: (recentStories ?? []) as any,
+        manualLevel,
     })
 
     const requestedReviewWords = unknownWordsInRecent.slice(0, 20)
@@ -183,6 +190,10 @@ export async function POST(req: NextRequest) {
                     controller.close()
                     return
                 }
+
+                // When user pinned a level, record that as the story's level so
+                // calibration history reflects user intent.
+                if (manualLevel !== undefined) level = manualLevel
 
                 // Coverage & new-word count
                 const segments = segmentText(content, targetLang).filter(

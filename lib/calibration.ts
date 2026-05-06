@@ -22,6 +22,8 @@ interface CalibrationInput {
     knownWords: string[]
     learningWords: string[]
     recentStories: RecentStory[]
+    // When set, override the inferred level — user pinned a target.
+    manualLevel?: number
 }
 
 const RATING_OFFSET: Record<string, number> = {
@@ -128,10 +130,17 @@ function excerptOf(content: string, language: string, maxLen = 200): string {
     return (lastSpace > maxLen * 0.6 ? truncated.slice(0, lastSpace) : truncated).trim() + '…'
 }
 
-export function buildCalibrationContext(input: CalibrationInput): string {
-    const { knownVocabCount, knownWords, learningWords, recentStories, targetLanguage, targetLanguageName } = input
+function levelLabel(language: string, level: number): string {
+    const isChinese = language === 'zh-CN' || language === 'zh-TW'
+    if (isChinese) return `HSK ${level}`
+    const cefr = ['A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'][Math.max(0, Math.min(6, level))]
+    return cefr ?? 'A1'
+}
 
-    if (knownVocabCount < 20 && recentStories.length === 0) {
+export function buildCalibrationContext(input: CalibrationInput): string {
+    const { knownVocabCount, knownWords, learningWords, recentStories, targetLanguage, targetLanguageName, manualLevel } = input
+
+    if (knownVocabCount < 20 && recentStories.length === 0 && manualLevel === undefined) {
         const isChinese = targetLanguage === 'zh-CN' || targetLanguage === 'zh-TW'
         const level = isChinese ? 'HSK 1 (Beginner)' : 'CEFR A1 (Beginner)'
         return `
@@ -175,10 +184,30 @@ ${rubricFor(targetLanguage)}
             ? '- Vocabulary actively learning: 0 words'
             : `- Vocabulary actively learning: ${learningWords.length} words: ${learningWords.slice(0, 30).join(', ')}`
 
+    const levelSection =
+        manualLevel !== undefined
+            ? `- TARGET LEVEL: ${levelLabel(targetLanguage, manualLevel)} (level ${manualLevel}) — user has pinned this level. Write at exactly this level regardless of recent ratings.
+- Inferred level (for reference only): ${inferredLevel !== null ? inferredLevel.toFixed(1) : 'unknown'}`
+            : `- Inferred level: ${inferredLevel !== null ? inferredLevel.toFixed(1) : 'unknown'} (recency-weighted, accounts for tap-density)`
+
+    const calibrationRules =
+        manualLevel !== undefined
+            ? `CALIBRATION RULES
+- The user has pinned the target level above — write at exactly that level. Do not push above or drop below based on recent ratings.
+- Recent stories are shown for vocabulary anchoring, not difficulty calibration.
+- Naturally re-use words from the "actively learning" list when they fit the topic — do not force them.`
+            : `CALIBRATION RULES
+- The recent-reading list is ordered newest-first; the most recent story carries the most weight. Use the excerpts as concrete anchors for what the user can read at this level.
+- "Tapped" means the user clicked the word for a definition while reading, i.e. they didn't know it.
+- If recent ratings are EASY and tap rates are low (<10%), push slightly above the inferred level.
+- If recent ratings are HARD or tap rates are high (>20%), drop to or below the inferred level.
+- Rating and tap-rate can disagree — trust the tap rate more for objective difficulty.
+- Naturally re-use words from the "actively learning" list when they fit the topic — do not force them.`
+
     return `
 USER PROFILE
 - Target language: ${targetLanguageName} (${targetLanguage})
-- Inferred level: ${inferredLevel !== null ? inferredLevel.toFixed(1) : 'unknown'} (recency-weighted, accounts for tap-density)
+${levelSection}
 
 ${rubricFor(targetLanguage)}
 
@@ -188,12 +217,6 @@ ${learningLine}
 - Recent reading (last ${recentStories.length}, newest first):
 ${recentBlocks || '  (none)'}
 
-CALIBRATION RULES
-- The recent-reading list is ordered newest-first; the most recent story carries the most weight. Use the excerpts as concrete anchors for what the user can read at this level.
-- "Tapped" means the user clicked the word for a definition while reading, i.e. they didn't know it.
-- If recent ratings are EASY and tap rates are low (<10%), push slightly above the inferred level.
-- If recent ratings are HARD or tap rates are high (>20%), drop to or below the inferred level.
-- Rating and tap-rate can disagree — trust the tap rate more for objective difficulty.
-- Naturally re-use words from the "actively learning" list when they fit the topic — do not force them.
+${calibrationRules}
 `
 }

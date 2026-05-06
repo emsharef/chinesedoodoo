@@ -47,9 +47,17 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
                     ← Back to Library
                 </Link>
                 <h1 className="text-3xl font-bold text-retro-primary mb-2">{story.title}</h1>
-                <div className="flex gap-4 text-sm text-retro-muted">
+                <div className="flex gap-4 text-sm text-retro-muted flex-wrap">
                     <span>HSK {story.difficulty_level || '?'}</span>
                     <span>{new Date(story.created_at).toLocaleDateString()}</span>
+                    {(story.new_word_count !== null && story.new_word_count !== undefined) && (
+                        <span className="text-retro-accent">
+                            {story.new_word_count} new
+                            {story.review_word_coverage !== null && story.review_word_coverage !== undefined && story.review_word_coverage > 0 && (
+                                <> · {Math.round(story.review_word_coverage * 100)}% review-word coverage</>
+                            )}
+                        </span>
+                    )}
                 </div>
             </div>
 

@@ -93,6 +93,14 @@ export default async function Dashboard() {
             </p>
             <div className="mt-4 text-xs text-retro-muted flex justify-between items-center">
               <span>{new Date(story.created_at).toLocaleDateString()}</span>
+              {(story.new_word_count !== null && story.new_word_count !== undefined) && (
+                <span className="text-retro-accent">
+                  {story.new_word_count} new
+                  {story.review_word_coverage !== null && story.review_word_coverage !== undefined && story.review_word_coverage > 0 && (
+                    <> · {Math.round(story.review_word_coverage * 100)}% review</>
+                  )}
+                </span>
+              )}
             </div>
           </Link>
         ))}

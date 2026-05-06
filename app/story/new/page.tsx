@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Shuffle, Sparkles } from 'lucide-react'
+import UserLevelChip from '@/components/UserLevelChip'
+import type { UserLevelSummary } from '@/lib/calibration'
 
 const GENRES = [
     'Sci-Fi', 'Fantasy', 'Mystery', 'Romance', 'Slice of Life', 'Fable', 'Thriller', 'Comedy', 'Horror', 'Wuxia',
@@ -38,6 +40,20 @@ export default function NewStoryPage() {
     const [streamContent, setStreamContent] = useState('')
     const [streamError, setStreamError] = useState<string | null>(null)
     const previewRef = useRef<HTMLDivElement>(null)
+
+    // User level chip
+    const [levelInfo, setLevelInfo] = useState<{ summary: UserLevelSummary; targetLanguage: string } | null>(null)
+    useEffect(() => {
+        let cancelled = false
+        ;(async () => {
+            const { getUserLevel } = await import('@/app/actions/user-level')
+            const info = await getUserLevel()
+            if (!cancelled && info) setLevelInfo(info)
+        })()
+        return () => {
+            cancelled = true
+        }
+    }, [])
 
     const isNonFiction = NON_FICTION.has(genre)
     const currentThemes = isNonFiction ? NON_FICTION_THEMES : FICTION_THEMES
@@ -162,9 +178,14 @@ export default function NewStoryPage() {
 
     return (
         <div className="container mx-auto px-4 py-8 max-w-3xl">
-            <div className="flex items-center gap-3 mb-8">
-                <Sparkles className="text-retro-primary" size={32} />
-                <h1 className="text-3xl font-bold text-retro-primary">Story Generator</h1>
+            <div className="flex items-center justify-between gap-3 mb-8 flex-wrap">
+                <div className="flex items-center gap-3">
+                    <Sparkles className="text-retro-primary" size={32} />
+                    <h1 className="text-3xl font-bold text-retro-primary">Story Generator</h1>
+                </div>
+                {levelInfo && (
+                    <UserLevelChip summary={levelInfo.summary} targetLanguage={levelInfo.targetLanguage} />
+                )}
             </div>
 
             <div className="bg-retro-paper p-8 rounded-xl border border-retro-muted/20 shadow-lg relative overflow-hidden">

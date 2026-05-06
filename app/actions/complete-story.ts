@@ -3,11 +3,21 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export async function markStoryAsRead(storyId: string, rating: 'easy' | 'good' | 'hard', words: string[], language: string = 'zh-CN') {
+export async function markStoryAsRead(
+    storyId: string,
+    rating: 'easy' | 'good' | 'hard',
+    words: string[],
+    language: string = 'zh-CN',
+    tappedWords: string[] = [],
+) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) throw new Error('Not authenticated')
+
+    // Tapped count is the count of unique words the user clicked while reading.
+    // Used as a continuous difficulty signal in calibration.
+    const tappedCount = new Set(tappedWords).size
 
     // 1. Update Story
     await supabase
@@ -15,7 +25,8 @@ export async function markStoryAsRead(storyId: string, rating: 'easy' | 'good' |
         .update({
             is_read: true,
             difficulty_rating: rating,
-            read_at: new Date().toISOString()
+            read_at: new Date().toISOString(),
+            tapped_word_count: tappedCount,
         })
         .eq('id', storyId)
 

@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
             .limit(100),
         supabase
             .from('chinese_stories')
-            .select('title, content, difficulty_rating, difficulty_level')
+            .select('title, content, difficulty_rating, difficulty_level, new_word_count, tapped_word_count')
             .eq('user_id', user.id)
             .eq('is_read', true)
             .eq('language', targetLang)

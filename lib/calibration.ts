@@ -9,6 +9,8 @@ interface RecentStory {
     content: string
     difficulty_rating: 'easy' | 'good' | 'hard' | null
     difficulty_level: number | null
+    new_word_count?: number | null
+    tapped_word_count?: number | null
 }
 
 interface CalibrationInput {
@@ -26,19 +28,57 @@ const RATING_OFFSET: Record<string, number> = {
     hard: -0.5,
 }
 
-function inferLevel(stories: RecentStory[]): number | null {
+// Recency-weighted level inference. The most recent story counts fully (1.0),
+// older stories decay by 0.7^i — so the 5-story trail weights are roughly
+// [1.00, 0.70, 0.49, 0.34, 0.24]. A user whose recent ratings shift hard
+// gets a sharper response than a flat median over the same trail would give.
+//
+// We also incorporate tap-density as a continuous secondary signal: a story rated
+// EASY but with 30% words tapped is contradictory, and the level should drift
+// down despite the rating. Concretely: every 10% of tapped words above 5%
+// subtracts 0.2 levels.
+export function inferLevel(stories: RecentStory[]): number | null {
     if (stories.length === 0) return null
-    const adjusted = stories
-        .map((s) => {
-            const lvl = s.difficulty_level ?? 2
-            const offset = RATING_OFFSET[s.difficulty_rating ?? 'good'] ?? 0
-            return lvl + offset
-        })
-        .sort((a, b) => a - b)
-    const mid = Math.floor(adjusted.length / 2)
-    return adjusted.length % 2 === 0
-        ? (adjusted[mid - 1] + adjusted[mid]) / 2
-        : adjusted[mid]
+
+    let weightSum = 0
+    let levelSum = 0
+    stories.forEach((s, i) => {
+        const baseLevel = s.difficulty_level ?? 2
+        const ratingOffset = RATING_OFFSET[s.difficulty_rating ?? 'good'] ?? 0
+
+        // Tap-density correction. We need words-in-story to compute pct;
+        // approximate via new + tapped (lower bound of seen words). When the
+        // story didn't capture either, the correction is zero.
+        const tapped = s.tapped_word_count ?? 0
+        const totalWordsApprox = (s.new_word_count ?? 0) + tapped
+        let tapCorrection = 0
+        if (totalWordsApprox > 0 && tapped > 0) {
+            const pct = tapped / totalWordsApprox
+            // 5% tapped is "smooth read" baseline; every 10% above costs 0.2 levels
+            tapCorrection = -Math.max(0, (pct - 0.05) / 0.1) * 0.2
+        }
+
+        const adjusted = baseLevel + ratingOffset + tapCorrection
+        const weight = Math.pow(0.7, i)
+        levelSum += adjusted * weight
+        weightSum += weight
+    })
+
+    return levelSum / weightSum
+}
+
+export interface UserLevelSummary {
+    level: number | null
+    confidence: 'low' | 'medium' | 'high'
+    storyCount: number
+}
+
+export function summarizeUserLevel(stories: RecentStory[]): UserLevelSummary {
+    const level = inferLevel(stories)
+    let confidence: 'low' | 'medium' | 'high' = 'low'
+    if (stories.length >= 7) confidence = 'high'
+    else if (stories.length >= 3) confidence = 'medium'
+    return { level, confidence, storyCount: stories.length }
 }
 
 export function buildCalibrationContext(input: CalibrationInput): string {
@@ -58,7 +98,13 @@ USER PROFILE
     const recentSummary = recentStories
         .map((s, i) => {
             const rating = (s.difficulty_rating ?? 'unknown').toUpperCase()
-            return `  ${i + 1}. "${s.title}" — ${rating} (level ${s.difficulty_level ?? '?'})`
+            const tapped = s.tapped_word_count
+            const newCount = s.new_word_count
+            const tapNote =
+                tapped !== null && tapped !== undefined && newCount !== null && newCount !== undefined
+                    ? ` · tapped ${tapped} of ~${tapped + newCount} unknown`
+                    : ''
+            return `  ${i + 1}. "${s.title}" — ${rating} (level ${s.difficulty_level ?? '?'}${tapNote})`
         })
         .join('\n')
 
@@ -68,17 +114,19 @@ USER PROFILE
     return `
 USER PROFILE
 - Target language: ${targetLanguageName} (${targetLanguage})
-- Inferred level: ${inferredLevel !== null ? inferredLevel.toFixed(1) : 'unknown'} (weighted median of recent ratings)
+- Inferred level: ${inferredLevel !== null ? inferredLevel.toFixed(1) : 'unknown'} (recency-weighted, accounts for tap-density)
 - Vocabulary known: ${knownVocabCount} words
 - Vocabulary actively learning: ${learningWords.length} words${learningSample ? `: ${learningSample}` : ''}
-- Recent reading (last ${recentStories.length}):
+- Recent reading (last ${recentStories.length}, newest first):
 ${recentSummary || '  (none)'}
 - Words user did NOT know in recent stories: ${unknownSample || '(none)'}
 
 CALIBRATION RULES
-- If the last 3 ratings are mostly EASY, push slightly above the inferred level.
-- If the last 3 ratings are mostly HARD, drop to the inferred level.
-- If mixed, maintain the inferred level but introduce new topics.
+- The recent-reading list is ordered newest-first; the most recent story carries the most weight.
+- "Tapped" means the user clicked the word for a definition while reading, i.e. they didn't know it.
+- If recent ratings are EASY and tap rates are low (<10%), push slightly above the inferred level.
+- If recent ratings are HARD or tap rates are high (>20%), drop to or below the inferred level.
+- Rating and tap-rate can disagree — trust the tap rate more for objective difficulty.
 - Naturally re-use words from the "actively learning" list and unknown-word list above when they fit the topic — do not force them.
 - If the unknown-word backlog is large (>10), prioritize reviewing those over introducing new words.
 `

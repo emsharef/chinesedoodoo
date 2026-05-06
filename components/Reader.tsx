@@ -30,6 +30,7 @@ export default function Reader({ segments, storyId, fontSize = 'medium', languag
     const [definition, setDefinition] = useState<DefinitionResult | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [showPinyin, setShowPinyin] = useState(false)
+    const [tappedWords, setTappedWords] = useState<Set<string>>(new Set())
 
     const isChinese = language === 'zh-CN' || language === 'zh-TW'
 
@@ -50,6 +51,12 @@ export default function Reader({ segments, storyId, fontSize = 'medium', languag
         setSelectedWord(word)
         setIsLoading(true)
         setDefinition(null)
+        setTappedWords((s) => {
+            if (s.has(word)) return s
+            const next = new Set(s)
+            next.add(word)
+            return next
+        })
 
         try {
             const result = await lookupWord(word, language)
@@ -75,7 +82,7 @@ export default function Reader({ segments, storyId, fontSize = 'medium', languag
                 words = segments.filter(s => s.trim().length > 0 && !/^[.,!?;:"'()\[\]]+$/.test(s))
             }
 
-            await markStoryAsRead(storyId, rating, words, language)
+            await markStoryAsRead(storyId, rating, words, language, Array.from(tappedWords))
             window.location.href = '/'
         } catch (error) {
             console.error(error)

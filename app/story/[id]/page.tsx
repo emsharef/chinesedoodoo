@@ -67,6 +67,9 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
                     storyId={story.id}
                     fontSize={profile?.font_size || 'medium'}
                     language={story.language || 'zh-CN'}
+                    initialPage={story.current_page ?? 0}
+                    isRead={!!story.is_read}
+                    readAt={story.read_at}
                 />
             </div>
 

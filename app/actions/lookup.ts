@@ -56,7 +56,7 @@ export async function lookupWord(word: string, language: string = 'zh-CN') {
         language: language,
         status: 'learning',
         next_review: new Date().toISOString()
-    }, { onConflict: 'user_id, word' }) // Note: Using existing constraint for now
+    }, { onConflict: 'user_id, word, language' })
 
     return {
         ...result,

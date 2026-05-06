@@ -53,10 +53,10 @@ export async function submitReview(itemId: string, rating: number) {
         stability: item.stability,
         difficulty: item.difficulty,
         elapsed_days: item.last_review ? (Date.now() - new Date(item.last_review).getTime()) / (1000 * 60 * 60 * 24) : 0,
-        scheduled_days: 0, // Not stored in DB directly, but needed for type? FSRS might calculate it.
+        scheduled_days: 0,
         reps: item.repetition_count,
-        lapses: 0, // We didn't store lapses, assume 0 or add column
-        state: (item.status === 'new' || !item.last_review) ? 0 : item.status === 'learning' ? 1 : item.status === 'review' ? 2 : 3, // 0=New, 1=Learning, 2=Review, 3=Relearning
+        lapses: item.lapses ?? 0,
+        state: (item.status === 'new' || !item.last_review) ? 0 : item.status === 'learning' ? 1 : item.status === 'review' ? 2 : 3,
         last_review: item.last_review ? new Date(item.last_review) : undefined as any,
     }
 
@@ -73,6 +73,7 @@ export async function submitReview(itemId: string, rating: number) {
             stability: newCard.stability,
             difficulty: newCard.difficulty,
             repetition_count: newCard.reps,
+            lapses: newCard.lapses,
             last_review: new Date().toISOString(),
             next_review: newCard.due.toISOString(),
             status: newCard.state === 0 ? 'new' : newCard.state === 1 ? 'learning' : newCard.state === 2 ? 'review' : 'relearning',

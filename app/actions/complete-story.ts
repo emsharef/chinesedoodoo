@@ -34,9 +34,13 @@ export async function markStoryAsRead(storyId: string, rating: 'easy' | 'good' |
             next_review: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // Review in 30 days
         }))
 
-        // Upsert (ignore duplicates if already known/learning)
-        // Note: This relies on the unique constraint. If language is part of it, great. If not, we might overwrite.
-        await supabase.from('chinese_vocab_items').upsert(updates, { onConflict: 'user_id, word' })
+        // Only INSERT new rows. Words already in vocab (status='learning' from a prior
+        // tap, or already 'known' from a previous complete) are NOT touched — completing
+        // a story must not reset the FSRS schedule of a word the user is actively studying.
+        await supabase.from('chinese_vocab_items').upsert(updates, {
+            onConflict: 'user_id, word, language',
+            ignoreDuplicates: true,
+        })
     }
 
     revalidatePath('/')

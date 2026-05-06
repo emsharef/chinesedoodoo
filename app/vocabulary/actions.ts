@@ -25,16 +25,6 @@ export async function deleteVocabularyItem(id: string) {
 
     if (!user) throw new Error('Unauthorized')
 
-    // Also delete related reviews? Or keep them for stats?
-    // Foreign key constraint might require deleting reviews first if cascade isn't set.
-    // Let's assume cascade or delete reviews manually.
-
-    await supabase
-        .from('chinese_reviews')
-        .delete()
-        .eq('vocab_item_id', id)
-        .eq('user_id', user.id)
-
     const { error } = await supabase
         .from('chinese_vocab_items')
         .delete()

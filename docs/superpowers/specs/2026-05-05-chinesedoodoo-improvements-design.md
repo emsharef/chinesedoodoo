@@ -36,7 +36,7 @@ The Postgres database is shared with another app in the same Supabase project. *
 | Provider  | Generation         | Lookup fallback     |
 | --------- | ------------------ | ------------------- |
 | Anthropic | claude-sonnet-4-6  | claude-haiku-4-5    |
-| OpenAI    | gpt-5.4            | gpt-5.4-mini          |
+| OpenAI    | gpt-5.4            | gpt-5.4-nano          |
 
 - Selected per-user via `chinese_profiles.llm_provider` (`'anthropic' | 'openai'`, default `'anthropic'`).
 - Settings page exposes the choice next to existing preferences.
@@ -139,7 +139,7 @@ having count(*) > 1;
 ### App code follow-on
 
 - `app/actions/lookup.ts`: change `onConflict: 'user_id, word'` → `'user_id, word, language'`
-- `app/actions/complete-story.ts`: same `onConflict` change
+- `app/actions/complete-story.ts`: same `onConflict` change, plus add `ignoreDuplicates: true` so finishing a story does not reset FSRS state for words already in vocab (today this silently destroys the review schedule of any word the user previously tapped). Untapped, never-seen words still get inserted as `known`.
 - `app/review/actions.ts`: persist `newCard.lapses` to the new column
 - `app/vocabulary/actions.ts`: drop manual delete-reviews-first (FK now cascades)
 

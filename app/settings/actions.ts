@@ -122,3 +122,29 @@ export async function updateLanguage(lang: string) {
     revalidatePath('/vocabulary')
     return { success: true }
 }
+
+export async function updateLLMProvider(provider: string) {
+    if (provider !== 'anthropic' && provider !== 'openai') {
+        throw new Error('Invalid provider')
+    }
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error('Unauthorized')
+
+    const { error } = await supabase
+        .from('chinese_profiles')
+        .upsert({
+            id: user.id,
+            llm_provider: provider,
+        }, { onConflict: 'id' })
+
+    if (error) {
+        console.error('Error updating LLM provider:', error)
+        throw new Error('Failed to update settings')
+    }
+
+    revalidatePath('/settings')
+    return { success: true }
+}

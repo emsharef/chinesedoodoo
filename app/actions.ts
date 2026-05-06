@@ -1,12 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { redirect } from 'next/navigation'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-})
+import { generateStory as llmGenerateStory, type LLMProvider } from '@/lib/llm'
 
 export async function generateStory(formData: FormData) {
     const genre = formData.get('genre') as string
@@ -32,11 +27,12 @@ export async function generateStory(formData: FormData) {
     // 1. Fetch User Stats & History
     const { data: profile } = await supabase
         .from('chinese_profiles')
-        .select('debug_mode, target_language')
+        .select('debug_mode, target_language, llm_provider')
         .eq('id', user.id)
         .single()
 
     const targetLang = profile?.target_language || 'zh-CN'
+    const provider: LLMProvider = (profile?.llm_provider as LLMProvider) || 'anthropic'
     const isChinese = targetLang === 'zh-CN' || targetLang === 'zh-TW'
     const langNameMap: Record<string, string> = {
         'zh-CN': 'Chinese (Simplified)',
@@ -98,7 +94,7 @@ export async function generateStory(formData: FormData) {
     }
 
     // 2. Construct Prompt
-    let systemPrompt = `You are an expert language teacher writing content for a student learning ${targetLangName}.`
+    const systemPrompt = `You are an expert language teacher writing content for a student learning ${targetLangName}.`
     let userPrompt = `Write a short story or article in ${targetLangName}.
     
     Parameters:
@@ -158,16 +154,11 @@ export async function generateStory(formData: FormData) {
     }
     `
 
-    const completion = await openai.chat.completions.create({
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-        ],
-        model: 'gpt-5.1',
-        response_format: { type: 'json_object' },
+    const result = await llmGenerateStory({
+        provider,
+        systemPrompt,
+        userPrompt,
     })
-
-    const result = JSON.parse(completion.choices[0].message.content || '{}')
 
     if (!result.title || !result.content) {
         throw new Error('Failed to generate story')

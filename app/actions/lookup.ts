@@ -1,11 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-})
+import { lookupWord as llmLookupWord, type LLMProvider } from '@/lib/llm'
 
 export async function lookupWord(word: string, language: string = 'zh-CN') {
     const supabase = await createClient()
@@ -30,22 +26,15 @@ export async function lookupWord(word: string, language: string = 'zh-CN') {
         }
     }
 
-    // If not, ask OpenAI
-    const isChinese = language === 'zh-CN' || language === 'zh-TW'
-    const pronunciationInstruction = isChinese
-        ? "pinyin with tone marks"
-        : "phonetic pronunciation (IPA or standard transcription)"
+    // Read provider preference
+    const { data: profile } = await supabase
+        .from('chinese_profiles')
+        .select('llm_provider')
+        .eq('id', user.id)
+        .single()
+    const provider: LLMProvider = (profile?.llm_provider as LLMProvider) || 'anthropic'
 
-    const prompt = `Define the word "${word}" (Language: ${language}).
-    Output JSON: { "pinyin": "${pronunciationInstruction}", "english": "concise english definition" }`
-
-    const completion = await openai.chat.completions.create({
-        messages: [{ role: 'user', content: prompt }],
-        model: 'gpt-5-mini',
-        response_format: { type: 'json_object' },
-    })
-
-    const result = JSON.parse(completion.choices[0].message.content || '{}')
+    const result = await llmLookupWord({ provider, word, language })
 
     // Save to vocab (status: learning)
     await supabase.from('chinese_vocab_items').upsert({

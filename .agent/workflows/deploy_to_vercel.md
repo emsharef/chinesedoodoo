@@ -21,7 +21,8 @@ In the "Configure Project" screen, expand the **"Environment Variables"** sectio
 | :--- | :--- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase Anonymous Key |
-| `OPENAI_API_KEY` | Your OpenAI API Key |
+| `ANTHROPIC_API_KEY` | Your Anthropic API Key (default provider for stories + lookups) |
+| `OPENAI_API_KEY` | Your OpenAI API Key (used when a user picks OpenAI in Settings) |
 
 > **Note:** You do not need `SUPABASE_DB_URL` for the application to run, as it is only used for running migration scripts locally.
 

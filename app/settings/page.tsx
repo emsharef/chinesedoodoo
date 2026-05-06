@@ -1,11 +1,12 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { signout } from '@/app/login/actions'
-import { LogOut, User, Lock, AlertTriangle, Code, Type, Globe } from 'lucide-react'
+import { LogOut, User, Lock, AlertTriangle, Code, Type, Globe, Sparkles } from 'lucide-react'
 import ResetAccountButton from './ResetAccountButton'
 import DebugModeToggle from './DebugModeToggle'
 import FontSizeSelector from './FontSizeSelector'
 import LanguageSelector from './LanguageSelector'
+import LLMProviderSelector from './LLMProviderSelector'
 
 export default async function SettingsPage() {
     const supabase = await createClient()
@@ -18,7 +19,7 @@ export default async function SettingsPage() {
 
     const { data: profile } = await supabase
         .from('chinese_profiles')
-        .select('debug_mode, font_size, target_language')
+        .select('debug_mode, font_size, target_language, llm_provider')
         .eq('id', user.id)
         .single()
 
@@ -87,6 +88,15 @@ export default async function SettingsPage() {
                         Target Language
                     </h2>
                     <LanguageSelector initialValue={profile?.target_language || 'zh-CN'} />
+                </div>
+
+                {/* AI Provider */}
+                <div className="p-6 border-b border-retro-muted/10 bg-retro-bg/30">
+                    <h2 className="text-xl font-semibold text-retro-text mb-4 flex items-center gap-2">
+                        <Sparkles size={20} />
+                        AI Provider
+                    </h2>
+                    <LLMProviderSelector initialValue={profile?.llm_provider || 'anthropic'} />
                 </div>
 
                 {/* Appearance Settings */}

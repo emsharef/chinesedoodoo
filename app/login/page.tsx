@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { login, signup } from './actions'
 
 export default function LoginPage() {
@@ -24,9 +25,14 @@ export default function LoginPage() {
                             />
                         </div>
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-retro-text">
-                                Password
-                            </label>
+                            <div className="flex items-center justify-between">
+                                <label htmlFor="password" className="block text-sm font-medium text-retro-text">
+                                    Password
+                                </label>
+                                <Link href="/login/forgot-password" className="text-sm text-retro-muted hover:text-retro-primary">
+                                    Forgot password?
+                                </Link>
+                            </div>
                             <input
                                 id="password"
                                 name="password"

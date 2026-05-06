@@ -75,3 +75,39 @@ export async function updatePassword(formData: FormData) {
     revalidatePath('/settings')
     return { success: true }
 }
+
+export async function requestPasswordReset(formData: FormData) {
+    const supabase = await createClient()
+    const origin = (await headers()).get('origin')
+    const email = formData.get('email') as string
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${origin}/auth/callback?next=/login/update-password`,
+    })
+
+    if (error) {
+        console.error('Password reset error:', error)
+        redirect('/error?message=' + encodeURIComponent(error.message))
+    }
+
+    redirect('/login/check-email')
+}
+
+export async function resetPassword(formData: FormData) {
+    const supabase = await createClient()
+    const password = formData.get('password') as string
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+        redirect('/error?message=' + encodeURIComponent('Reset link expired. Please request a new one.'))
+    }
+
+    const { error } = await supabase.auth.updateUser({ password })
+
+    if (error) {
+        redirect('/error?message=' + encodeURIComponent(error.message))
+    }
+
+    revalidatePath('/', 'layout')
+    redirect('/')
+}

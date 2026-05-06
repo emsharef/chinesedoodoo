@@ -8,9 +8,7 @@ export const metadata: Metadata = {
   description: "Learn Chinese through reading AI-generated stories.",
 };
 
-import Sidebar from "@/components/Sidebar";
-import BottomNav from "@/components/BottomNav";
-import MobileHeader from "@/components/MobileHeader";
+import LayoutShell from "@/components/LayoutShell";
 
 export default function RootLayout({
   children,
@@ -22,12 +20,7 @@ export default function RootLayout({
       <body
         className="antialiased bg-retro-bg text-retro-text font-sans min-h-screen flex flex-col md:flex-row"
       >
-        <MobileHeader />
-        <Sidebar />
-        <main className="flex-1 md:ml-64 min-h-screen pb-24 md:pb-0 pt-16 md:pt-0">
-          {children}
-        </main>
-        <BottomNav />
+        <LayoutShell>{children}</LayoutShell>
       </body>
     </html>
   );

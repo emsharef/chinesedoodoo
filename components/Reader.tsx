@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Volume2, Smile, ThumbsUp, Dumbbell } from 'lucide-react'
+import { Smile, ThumbsUp, Dumbbell } from 'lucide-react'
 import { lookupWord } from '@/app/actions/lookup'
 
 interface ReaderProps {
@@ -20,13 +20,28 @@ const FONT_SIZES: Record<string, string> = {
     xl: 'text-3xl'
 }
 
+interface DefinitionResult {
+    pinyin?: string
+    english: string
+}
+
 export default function Reader({ segments, storyId, fontSize = 'medium', language = 'zh-CN' }: ReaderProps) {
     const [selectedWord, setSelectedWord] = useState<string | null>(null)
-    const [definition, setDefinition] = useState<any | null>(null)
+    const [definition, setDefinition] = useState<DefinitionResult | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [showPinyin, setShowPinyin] = useState(false)
 
     const isChinese = language === 'zh-CN' || language === 'zh-TW'
+
+    // ESC closes the popover
+    useEffect(() => {
+        if (!selectedWord) return
+        function onKey(e: KeyboardEvent) {
+            if (e.key === 'Escape') setSelectedWord(null)
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [selectedWord])
 
     async function handleWordClick(word: string) {
         // Ignore punctuation/spaces if possible, but for now just allow clicking everything
@@ -71,13 +86,13 @@ export default function Reader({ segments, storyId, fontSize = 'medium', languag
     }
 
     return (
-        <div className="relative pb-20">
-            {/* Controls - Only show Pinyin toggle for Chinese */}
+        <div className="relative pb-32 md:pb-20">
+            {/* Pinyin toggle in header — Chinese only */}
             {isChinese && (
-                <div className="fixed bottom-8 right-8 flex gap-4 z-10">
+                <div className="flex justify-end mb-4">
                     <button
                         onClick={() => setShowPinyin(!showPinyin)}
-                        className="bg-retro-paper border border-retro-primary text-retro-primary px-4 py-2 rounded-full shadow-lg hover:bg-retro-bg transition-colors"
+                        className="bg-retro-paper border border-retro-primary/50 text-retro-primary px-3 py-1.5 rounded-md text-sm hover:bg-retro-primary/10 transition-colors"
                     >
                         {showPinyin ? 'Hide Pinyin' : 'Show Pinyin'}
                     </button>

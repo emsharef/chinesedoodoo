@@ -1,7 +1,12 @@
 import Link from 'next/link'
 import { login, signup } from './actions'
 
-export default function LoginPage() {
+export default async function LoginPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ message?: string }>
+}) {
+    const params = await searchParams
     return (
         <div className="flex min-h-screen flex-col items-center justify-center p-6">
             <div className="w-full max-w-md space-y-8 bg-retro-paper p-8 rounded-xl shadow-lg border border-retro-muted/20">
@@ -9,6 +14,12 @@ export default function LoginPage() {
                     <h1 className="text-3xl font-bold text-retro-primary mb-2">ChineseDuDu</h1>
                     <p className="text-retro-muted">Sign in to start reading</p>
                 </div>
+
+                {params.message && (
+                    <div className="bg-retro-accent/10 border border-retro-accent/30 text-retro-accent text-sm px-4 py-2 rounded-md">
+                        {params.message}
+                    </div>
+                )}
 
                 <form className="mt-8 space-y-6">
                     <div className="space-y-4">

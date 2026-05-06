@@ -2,20 +2,38 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { FSRS, Card, Rating } from 'fsrs.js'
-import { lookupWord } from '@/app/actions/lookup'
 
 const fsrs = new FSRS()
 
-export async function getDueCards(language: string = 'zh-CN') {
+export async function getReviewQueue(language: string = 'zh-CN', limit: number = 30) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return []
+    if (!user) return { items: [], dueCount: 0, newCount: 0, learningCount: 0 }
 
     const now = new Date().toISOString()
 
-    // Fetch items where next_review < now OR next_review is null (new items)
-    // Actually, 'new' items might have null next_review.
-    // Let's fetch all 'learning' or 'review' items due, plus some 'new' items.
+    // Counts (head-only queries, no row data)
+    const [{ count: dueCount }, { count: newCount }, { count: learningCount }] = await Promise.all([
+        supabase
+            .from('chinese_vocab_items')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('language', language)
+            .in('status', ['learning', 'review', 'relearning'])
+            .lte('next_review', now),
+        supabase
+            .from('chinese_vocab_items')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('language', language)
+            .eq('status', 'new'),
+        supabase
+            .from('chinese_vocab_items')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('language', language)
+            .eq('status', 'learning'),
+    ])
 
     const { data: items } = await supabase
         .from('chinese_vocab_items')
@@ -24,16 +42,43 @@ export async function getDueCards(language: string = 'zh-CN') {
         .eq('language', language)
         .in('status', ['new', 'learning', 'review', 'relearning'])
         .or(`next_review.lte.${now},next_review.is.null`)
-        .limit(20) // Limit session size
+        .order('next_review', { ascending: true, nullsFirst: false })
+        .limit(limit)
 
-    // We need definitions for these words to show on the back of the card.
-    // Since we don't store definitions permanently yet (we just looked them up dynamically),
-    // we might need to re-fetch them or store them.
-    // Optimization: Store definition in vocab_items or a separate dictionary table.
-    // For now, let's just fetch them dynamically if missing (slow but works for MVP).
-    // Actually, let's just return the items and let the client fetch definition on "Show Answer".
+    return {
+        items: items ?? [],
+        dueCount: dueCount ?? 0,
+        newCount: newCount ?? 0,
+        learningCount: learningCount ?? 0,
+    }
+}
 
-    return items || []
+// Find an example sentence by scanning the user's recent stories for one that contains the word.
+export async function findExampleSentence(word: string, language: string = 'zh-CN'): Promise<string | null> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+
+    const { data: stories } = await supabase
+        .from('chinese_stories')
+        .select('content')
+        .eq('user_id', user.id)
+        .eq('language', language)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+    if (!stories) return null
+    const isChinese = language === 'zh-CN' || language === 'zh-TW'
+    const sentenceSplit = isChinese ? /(?<=[。！？])/u : /(?<=[.!?])\s+/u
+
+    for (const story of stories) {
+        const sentences = story.content.split(sentenceSplit) as string[]
+        const match = sentences.find((s) => s.includes(word))
+        if (match && match.length > 0 && match.length < 200) {
+            return match.trim()
+        }
+    }
+    return null
 }
 
 export async function submitReview(itemId: string, rating: number) {
@@ -88,4 +133,20 @@ export async function submitReview(itemId: string, rating: number) {
     })
 
     return { success: true }
+}
+
+export async function getDueCount(language: string = 'zh-CN') {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return 0
+
+    const { count } = await supabase
+        .from('chinese_vocab_items')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('language', language)
+        .in('status', ['learning', 'review', 'relearning'])
+        .lte('next_review', new Date().toISOString())
+
+    return count ?? 0
 }

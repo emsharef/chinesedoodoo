@@ -3,7 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Reader from '@/components/Reader'
 import Link from 'next/link'
-import { Segment, useDefault } from 'segmentit'
+import { levelLabel } from '@/lib/levels'
 
 export default async function StoryPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -48,7 +48,7 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
                 </Link>
                 <h1 className="text-3xl font-bold text-retro-primary mb-2">{story.title}</h1>
                 <div className="flex gap-4 text-sm text-retro-muted flex-wrap">
-                    <span>HSK {story.difficulty_level || '?'}</span>
+                    <span>{levelLabel(story.language, story.difficulty_level)}</span>
                     <span>{new Date(story.created_at).toLocaleDateString()}</span>
                     {(story.new_word_count !== null && story.new_word_count !== undefined) && (
                         <span className="text-retro-accent">

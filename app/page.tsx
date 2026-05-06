@@ -1,7 +1,8 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Plus, BookOpen, CheckCircle, Smile, ThumbsUp, Dumbbell } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import LibraryGrid from './LibraryGrid'
 
 export default async function Dashboard() {
   const supabase = await createClient()
@@ -26,15 +27,6 @@ export default async function Dashboard() {
     .eq('language', targetLang)
     .order('created_at', { ascending: false })
 
-  const FONT_SIZES: Record<string, { title: string, content: string }> = {
-    small: { title: 'text-lg', content: 'text-xs' },
-    medium: { title: 'text-xl', content: 'text-sm' },
-    large: { title: 'text-2xl', content: 'text-base' },
-    xl: { title: 'text-3xl', content: 'text-lg' }
-  }
-
-  const currentSize = FONT_SIZES[profile?.font_size || 'medium']
-
   return (
     <div className="container mx-auto px-4 py-8">
       <header className="flex justify-between items-center mb-8">
@@ -53,70 +45,11 @@ export default async function Dashboard() {
         </div>
       </header>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {stories?.map((story) => (
-          <Link
-            key={story.id}
-            href={`/story/${story.id}`}
-            className="group block p-6 bg-retro-paper rounded-xl border border-retro-muted/20 hover:border-retro-primary/50 transition-all hover:shadow-lg hover:shadow-retro-primary/5"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-retro-bg rounded-lg text-retro-primary group-hover:text-retro-accent transition-colors">
-                  <BookOpen size={24} />
-                </div>
-                {story.is_read && (
-                  <div className="flex items-center gap-2" title={`Read on ${new Date(story.read_at).toLocaleDateString()}`}>
-                    {story.difficulty_rating === 'easy' && <Smile size={20} className="text-green-500" />}
-                    {story.difficulty_rating === 'good' && <ThumbsUp size={20} className="text-blue-500" />}
-                    {story.difficulty_rating === 'hard' && <Dumbbell size={20} className="text-red-500" />}
-                    {!story.difficulty_rating && <CheckCircle size={20} className="text-retro-muted" />}
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col items-end">
-                <span className="text-xs font-mono text-retro-muted border border-retro-muted/30 px-2 py-1 rounded">
-                  HSK {story.difficulty_level || '?'}
-                </span>
-                {story.is_read && story.read_at && (
-                  <span className="text-[10px] text-retro-muted mt-1">
-                    {new Date(story.read_at).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-            </div>
-            <h2 className={`${currentSize.title} font-bold text-retro-text group-hover:text-retro-primary transition-colors mb-2`}>
-              {story.title}
-            </h2>
-            <p className={`text-retro-muted line-clamp-3 ${currentSize.content}`}>
-              {story.content.substring(0, 100)}...
-            </p>
-            <div className="mt-4 text-xs text-retro-muted flex justify-between items-center">
-              <span>{new Date(story.created_at).toLocaleDateString()}</span>
-              {(story.new_word_count !== null && story.new_word_count !== undefined) && (
-                <span className="text-retro-accent">
-                  {story.new_word_count} new
-                  {story.review_word_coverage !== null && story.review_word_coverage !== undefined && story.review_word_coverage > 0 && (
-                    <> · {Math.round(story.review_word_coverage * 100)}% review</>
-                  )}
-                </span>
-              )}
-            </div>
-          </Link>
-        ))}
-
-        {stories?.length === 0 && (
-          <div className="col-span-full text-center py-12 border-2 border-dashed border-retro-muted/20 rounded-xl">
-            <p className="text-retro-muted mb-4">No stories yet. Generate your first one!</p>
-            <Link
-              href="/story/new"
-              className="text-retro-primary hover:underline"
-            >
-              Create a Story
-            </Link>
-          </div>
-        )}
-      </div>
+      <LibraryGrid
+        stories={stories ?? []}
+        fontSize={profile?.font_size || 'medium'}
+        targetLang={targetLang}
+      />
     </div>
   )
 }

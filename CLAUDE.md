@@ -13,14 +13,16 @@ There is no test suite.
 
 ### Database migrations
 
-Migrations are one-off TypeScript scripts in `scripts/`, not a managed framework. Each script:
-- loads `.env.local` manually with `dotenv`
-- connects via `SUPABASE_DB_URL` (the pooled Postgres URL — only used locally, not by the deployed app)
-- runs idempotent `ALTER TABLE … ADD COLUMN IF NOT EXISTS` SQL
+Migrations are plain SQL files in `supabase/migrations/`, named `<YYYYMMDDHHMMSS>_<topic>.sql`. Apply with:
 
-There is no npm script for them. Run individually with `ts-node` (an ESM-aware runner is needed because the scripts use `import.meta.url`), e.g. `npx ts-node --esm scripts/migrate-multilang.ts`. `scripts/setup-db.ts` creates the initial schema; the remaining `migrate-*.ts` scripts each add one column/feature and should be run in chronological order if rebuilding a database from scratch.
+```bash
+set -a && source .env.local && set +a && \
+  psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/<file>.sql
+```
 
-When adding a schema change, write a new `migrate-*.ts` following the existing pattern rather than editing prior ones.
+`SUPABASE_DB_URL` is a pooled superuser connection string used only locally for migrations — it bypasses RLS by design and must not be referenced from app code.
+
+When adding a schema change, write a new SQL file. Wrap multi-statement migrations in `begin; ... commit;` so they're atomic. **Other-app tables in the same Supabase project (`babies`, `events`, `invites`, `memberships`, `users`, `baby_invites`) must remain untouched** — every statement should be scoped explicitly to `chinese_*`.
 
 ## Architecture
 

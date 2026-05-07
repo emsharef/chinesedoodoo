@@ -357,6 +357,12 @@ export default function Reader({
             >
                 <p className="flex flex-wrap gap-x-1 gap-y-4 items-end">
                     {currentSegments.map((word, index) => renderWord(word, `${currentPage}-${index}`))}
+                    {isStreaming && isLastPage && (
+                        <span
+                            aria-hidden
+                            className="inline-block w-2 h-6 bg-retro-primary/70 animate-pulse align-middle ml-1"
+                        />
+                    )}
                 </p>
             </div>
 
@@ -405,7 +411,6 @@ export default function Reader({
             <div className="mt-4 shrink-0 h-[110px] flex items-center justify-center">
                 {isStreaming ? (
                     <div className="flex items-center gap-2 text-retro-muted">
-                        <span className="inline-block w-2 h-5 bg-retro-primary/70 animate-pulse" />
                         <span className="text-sm font-mono">{streamingLabel || 'Streaming…'}</span>
                     </div>
                 ) : isLastPage && (

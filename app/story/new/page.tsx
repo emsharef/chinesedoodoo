@@ -375,14 +375,15 @@ export default function NewStoryPage() {
                     </div>
                 </div>
 
-                <div className="mt-8 flex gap-4 relative z-10">
+                <div className="mt-6 sm:mt-8 flex gap-2 sm:gap-4 relative z-10">
                     <button
                         type="button"
                         onClick={randomize}
                         disabled={isLoading}
-                        className="flex items-center gap-2 px-6 py-3 rounded-full border-2 border-retro-primary text-retro-primary font-bold hover:bg-retro-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-3 rounded-full border-2 border-retro-primary text-retro-primary font-bold text-sm sm:text-base whitespace-nowrap hover:bg-retro-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        <Shuffle size={20} />
+                        <Shuffle size={16} className="sm:hidden" />
+                        <Shuffle size={20} className="hidden sm:inline" />
                         Randomize
                     </button>
 
@@ -390,16 +391,18 @@ export default function NewStoryPage() {
                         type="button"
                         onClick={handleGenerate}
                         disabled={isLoading}
-                        className="flex-1 flex items-center justify-center gap-2 rounded-full bg-retro-primary px-6 py-3 text-lg font-bold text-retro-bg hover:bg-retro-primary/90 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                        className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 rounded-full bg-retro-primary px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-lg font-bold text-retro-bg whitespace-nowrap hover:bg-retro-primary/90 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                     >
                         {isLoading ? (
                             <>
-                                <Loader2 className="animate-spin" />
+                                <Loader2 size={16} className="animate-spin sm:hidden" />
+                                <Loader2 size={20} className="animate-spin hidden sm:inline" />
                                 Thinking…
                             </>
                         ) : (
                             <>
-                                <Sparkles size={20} />
+                                <Sparkles size={16} className="sm:hidden" />
+                                <Sparkles size={20} className="hidden sm:inline" />
                                 Generate {isNonFiction ? 'Article' : 'Story'}
                             </>
                         )}

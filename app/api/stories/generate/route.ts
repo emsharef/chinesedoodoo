@@ -1,6 +1,6 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { generateStoryStream, type LLMProvider } from '@/lib/llm'
+import { generateStory, type LLMProvider } from '@/lib/llm'
 import { buildCalibrationContext } from '@/lib/calibration'
 import { Segment, useDefault } from 'segmentit'
 
@@ -41,18 +41,16 @@ function segmentText(content: string, language: string): string[] {
         const segmentit = useDefault(new Segment())
         return segmentit.doSegment(content).map((s) => s.w)
     }
-    // European: words by Unicode word characters
     return Array.from(content.matchAll(/[\p{L}\p{M}]+/gu)).map((m) => m[0])
 }
 
 export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return new Response('Unauthorized', { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = (await req.json()) as RequestBody
 
-    // Read profile (provider, language, debug_mode)
     const { data: profile } = await supabase
         .from('chinese_profiles')
         .select('debug_mode, target_language, llm_provider')
@@ -68,9 +66,6 @@ export async function POST(req: NextRequest) {
     const targetLength = (isChinese ? CHAR_LENGTH_MAP : WORD_LENGTH_MAP)[lengthKey] ?? (isChinese ? 300 : 200)
     const lengthUnit = isChinese ? 'characters' : 'words'
 
-    // Fetch user vocab + history (filtered by language).
-    // Known words: pull up to 200 ordered by recency so we can either dump the
-    // full list (when small) or take the 30 most-recent as a calibration sample.
     const [{ count: knownCount }, { data: learningRows }, { data: recentStories }, { data: knownRows }] = await Promise.all([
         supabase
             .from('chinese_vocab_items')
@@ -106,11 +101,8 @@ export async function POST(req: NextRequest) {
     const learningWords = (learningRows ?? []).map((r) => r.word as string)
     const knownByRecency = (knownRows ?? []).map((r) => r.word as string)
     const knownCountVal = knownCount ?? 0
-    // Below 200 known: send the full list (~50–250 tokens). At/above 200: send a
-    // 30-word recency sample as a calibration anchor.
     const knownWords = knownCountVal < 200 ? knownByRecency : knownByRecency.slice(0, 30)
 
-    // Words from recent stories that the user previously got wrong (still in non-known status)
     const unknownWordsInRecent: string[] = []
     if (recentStories && recentStories.length > 0 && learningWords.length > 0) {
         const allText = recentStories.map((s) => s.content).join(' ')
@@ -139,7 +131,6 @@ export async function POST(req: NextRequest) {
 
     const requestedReviewWords = unknownWordsInRecent.slice(0, 20)
 
-    // Construct prompts
     const systemPrompt = `You are an expert language teacher writing graded reading content for a student learning ${langName}.`
 
     const userPromptParts: string[] = []
@@ -156,114 +147,63 @@ export async function POST(req: NextRequest) {
 
     const userPrompt = userPromptParts.join('\n\n')
 
-    // Stream
-    const encoder = new TextEncoder()
-    const sseStream = new ReadableStream({
-        async start(controller) {
-            const send = (data: unknown) => {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
-            }
-            try {
-                let title = ''
-                let content = ''
-                let level = 1
+    try {
+        const result = await generateStory({ provider, systemPrompt, userPrompt })
+        const title = result.title
+        const content = result.content
+        const level = manualLevel !== undefined ? manualLevel : (result.estimated_level ?? 1)
 
-                for await (const event of generateStoryStream({ provider, systemPrompt, userPrompt })) {
-                    if (event.type === 'level') {
-                        level = event.level
-                        send({ type: 'level', level: event.level })
-                    } else if (event.type === 'title') {
-                        title = event.title
-                        send({ type: 'title', title: event.title })
-                    } else if (event.type === 'chunk') {
-                        content += event.text
-                        send({ type: 'chunk', text: event.text })
-                    } else if (event.type === 'done') {
-                        title = event.title || title
-                        content = event.content || content
-                        level = event.level || level
-                    }
-                }
+        if (!title || !content) {
+            return NextResponse.json({ error: 'Empty response from model' }, { status: 502 })
+        }
 
-                if (!title || !content) {
-                    send({ type: 'error', message: 'Empty response from model' })
-                    controller.close()
-                    return
-                }
+        const segments = segmentText(content, targetLang).filter(
+            (s) => s.trim().length > 0 && !/^[\s.,!?;:"'()\[\]，。！？；：""''（）]+$/.test(s),
+        )
+        const reviewWordsLandedSet = new Set(
+            requestedReviewWords.filter((w) => segments.includes(w)),
+        )
+        const coverage =
+            requestedReviewWords.length > 0
+                ? reviewWordsLandedSet.size / requestedReviewWords.length
+                : null
 
-                // When user pinned a level, record that as the story's level so
-                // calibration history reflects user intent.
-                if (manualLevel !== undefined) level = manualLevel
+        const knownAndLearningSet = new Set<string>([...learningWords])
+        const { data: allVocab } = await supabase
+            .from('chinese_vocab_items')
+            .select('word')
+            .eq('user_id', user.id)
+            .eq('language', targetLang)
+        for (const r of allVocab ?? []) knownAndLearningSet.add(r.word as string)
 
-                // Coverage & new-word count
-                const segments = segmentText(content, targetLang).filter(
-                    (s) => s.trim().length > 0 && !/^[\s.,!?;:"'()\[\]，。！？；：""''（）]+$/.test(s),
-                )
-                const reviewWordsLandedSet = new Set(
-                    requestedReviewWords.filter((w) => segments.includes(w)),
-                )
-                const coverage =
-                    requestedReviewWords.length > 0
-                        ? reviewWordsLandedSet.size / requestedReviewWords.length
-                        : null
+        const uniqueSegments = new Set(segments)
+        let newCount = 0
+        for (const w of uniqueSegments) {
+            if (!knownAndLearningSet.has(w)) newCount += 1
+        }
 
-                const knownAndLearningSet = new Set([
-                    ...learningWords,
-                    // We don't have the full known list cheaply; treat anything in vocab table as "seen"
-                ])
-                const { data: allVocab } = await supabase
-                    .from('chinese_vocab_items')
-                    .select('word')
-                    .eq('user_id', user.id)
-                    .eq('language', targetLang)
-                for (const r of allVocab ?? []) knownAndLearningSet.add(r.word as string)
+        const { data: story, error } = await supabase
+            .from('chinese_stories')
+            .insert({
+                user_id: user.id,
+                title,
+                content,
+                difficulty_level: level,
+                language: targetLang,
+                review_word_coverage: coverage,
+                new_word_count: newCount,
+                debug_prompt: debugMode ? `${systemPrompt}\n\n---\n\n${userPrompt}` : null,
+            })
+            .select()
+            .single()
 
-                const uniqueSegments = new Set(segments)
-                let newCount = 0
-                for (const w of uniqueSegments) {
-                    if (!knownAndLearningSet.has(w)) newCount += 1
-                }
+        if (error) {
+            return NextResponse.json({ error: error.message }, { status: 500 })
+        }
 
-                const { data: story, error } = await supabase
-                    .from('chinese_stories')
-                    .insert({
-                        user_id: user.id,
-                        title,
-                        content,
-                        difficulty_level: level,
-                        language: targetLang,
-                        review_word_coverage: coverage,
-                        new_word_count: newCount,
-                        debug_prompt: debugMode ? `${systemPrompt}\n\n---\n\n${userPrompt}` : null,
-                    })
-                    .select()
-                    .single()
-
-                if (error) {
-                    send({ type: 'error', message: error.message })
-                    controller.close()
-                    return
-                }
-
-                send({
-                    type: 'done',
-                    storyId: story.id,
-                    coverage,
-                    newWordCount: newCount,
-                })
-            } catch (err) {
-                send({ type: 'error', message: err instanceof Error ? err.message : String(err) })
-            } finally {
-                controller.close()
-            }
-        },
-    })
-
-    return new Response(sseStream, {
-        headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache, no-transform',
-            Connection: 'keep-alive',
-        },
-    })
+        return NextResponse.json({ storyId: story.id, coverage, newWordCount: newCount })
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        return NextResponse.json({ error: message }, { status: 500 })
+    }
 }

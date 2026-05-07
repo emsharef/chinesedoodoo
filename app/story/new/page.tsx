@@ -1,13 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { Loader2, Shuffle, Sparkles } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { Shuffle, Sparkles } from 'lucide-react'
 import UserLevelChip from '@/components/UserLevelChip'
-import StoryShell from '@/components/StoryShell'
-import Reader from '@/components/Reader'
-import { useHideChromeWhile } from '@/components/ChromeContext'
-import { segmentText } from '@/lib/segment'
-import { levelLabel } from '@/lib/levels'
 import type { UserLevelSummary } from '@/lib/calibration'
 
 const GENRES = [
@@ -42,30 +38,33 @@ function levelOptions(language: string): { value: string; label: string }[] {
 
 const STORAGE_KEY = 'chinesedoodoo:newStorySelection'
 
-type Phase = 'form' | 'streaming'
+const ACTIVITY_MESSAGES = [
+    'Constructing the plot…',
+    'Embedding your vocabulary…',
+    'Designing the characters…',
+    'Calibrating difficulty…',
+    'Setting the scene…',
+    'Polishing the prose…',
+    'Choosing just the right words…',
+    'Weaving the narrative…',
+    'Sketching the dialogue…',
+    'Adding finishing touches…',
+]
+
+type Phase = 'form' | 'loading'
 
 export default function NewStoryPage() {
+    const router = useRouter()
     const [phase, setPhase] = useState<Phase>('form')
-    const [isLoading, setIsLoading] = useState(false)
     const [genre, setGenre] = useState(GENRES[0])
     const [theme, setTheme] = useState(FICTION_THEMES[0])
     const [setting, setSetting] = useState(FICTION_SETTINGS[0])
     const [length, setLength] = useState(LENGTH_OPTIONS[1].value)
     const [targetLevel, setTargetLevel] = useState<string>('auto')
     const [freeText, setFreeText] = useState('')
+    const [error, setError] = useState<string | null>(null)
+    const [activityIndex, setActivityIndex] = useState(0)
 
-    // Streaming state — title arrives mid-stream, content fills incrementally
-    const [streamTitle, setStreamTitle] = useState('')
-    const [streamContent, setStreamContent] = useState('')
-    const [streamLevel, setStreamLevel] = useState<number | null>(null)
-    const [streamError, setStreamError] = useState<string | null>(null)
-    const [savedStoryId, setSavedStoryId] = useState<string | null>(null)
-
-    // Hide global chrome while streaming so the StoryShell layout matches what
-    // /story/[id] will render after navigation — no chrome shift on done.
-    useHideChromeWhile(phase === 'streaming')
-
-    // User level chip
     const [levelInfo, setLevelInfo] = useState<{ summary: UserLevelSummary; targetLanguage: string } | null>(null)
     useEffect(() => {
         let cancelled = false
@@ -91,9 +90,6 @@ export default function NewStoryPage() {
         setTheme(themes[Math.floor(Math.random() * themes.length)])
         setSetting(settings[Math.floor(Math.random() * settings.length)])
         setLength(LENGTH_OPTIONS[Math.floor(Math.random() * LENGTH_OPTIONS.length)].value)
-        // Free-text overrides the dropdowns at submit time, so randomize would
-        // be a no-op visually if we left the textarea populated. Clearing it
-        // keeps the randomized dropdown choice meaningful.
         setFreeText('')
     }
 
@@ -123,6 +119,15 @@ export default function NewStoryPage() {
         if (!currentSettings.includes(setting)) setSetting(currentSettings[0])
     }, [genre, currentThemes, currentSettings, theme, setting])
 
+    // Rotate activity messages while loading.
+    useEffect(() => {
+        if (phase !== 'loading') return
+        const interval = setInterval(() => {
+            setActivityIndex((i) => (i + 1) % ACTIVITY_MESSAGES.length)
+        }, 2400)
+        return () => clearInterval(interval)
+    }, [phase])
+
     function persistSelection() {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({ genre, theme, setting, length, targetLevel, freeText }))
@@ -133,13 +138,9 @@ export default function NewStoryPage() {
 
     async function handleGenerate() {
         persistSelection()
-        setIsLoading(true)
-        setStreamTitle('')
-        setStreamContent('')
-        setStreamLevel(null)
-        setSavedStoryId(null)
-        setStreamError(null)
-        setPhase('streaming')
+        setError(null)
+        setActivityIndex(0)
+        setPhase('loading')
 
         try {
             const response = await fetch('/api/stories/generate', {
@@ -154,63 +155,16 @@ export default function NewStoryPage() {
                     freeText: freeText.trim() || undefined,
                 }),
             })
-            if (!response.ok || !response.body) {
-                throw new Error(`Server returned ${response.status}`)
+
+            const data = await response.json()
+            if (!response.ok || !data.storyId) {
+                throw new Error(data?.error || `Server returned ${response.status}`)
             }
-
-            const reader = response.body.getReader()
-            const decoder = new TextDecoder()
-            let buffer = ''
-            let storyId: string | null = null
-            let sawError = false
-
-            while (true) {
-                const { done, value } = await reader.read()
-                if (done) break
-                buffer += decoder.decode(value, { stream: true })
-
-                const messages = buffer.split('\n\n')
-                buffer = messages.pop() ?? ''
-
-                for (const msg of messages) {
-                    const line = msg.trim()
-                    if (!line.startsWith('data: ')) continue
-                    const payload = line.slice('data: '.length)
-                    let data: any
-                    try {
-                        data = JSON.parse(payload)
-                    } catch {
-                        continue
-                    }
-                    if (data.type === 'title') setStreamTitle(data.title)
-                    else if (data.type === 'level') setStreamLevel(data.level)
-                    else if (data.type === 'chunk') setStreamContent((c) => c + data.text)
-                    else if (data.type === 'error') {
-                        sawError = true
-                        setStreamError(data.message)
-                    }
-                    else if (data.type === 'done') storyId = data.storyId
-                }
-            }
-
-            if (storyId && !sawError) {
-                // Promote the streaming Reader to "ready": tap activates,
-                // difficulty buttons appear on last page, progress saves.
-                // Update URL silently — no navigation, no remount, no flicker.
-                setSavedStoryId(storyId)
-                window.history.replaceState({}, '', `/story/${storyId}`)
-            } else if (!sawError) {
-                setStreamError('Generation finished without a story ID')
-                setPhase('form')
-            } else {
-                setPhase('form')
-            }
-        } catch (error) {
-            console.error(error)
-            setStreamError(error instanceof Error ? error.message : 'Failed to generate story')
+            router.push(`/story/${data.storyId}`)
+        } catch (err) {
+            console.error(err)
+            setError(err instanceof Error ? err.message : 'Failed to generate story')
             setPhase('form')
-        } finally {
-            setIsLoading(false)
         }
     }
 
@@ -223,64 +177,35 @@ export default function NewStoryPage() {
     })()
     const levelOpts = levelOptions(targetLang)
 
-    // Segment streaming content client-side. While streaming, use a cheap
-    // tokenizer (one char per segment for Chinese, whitespace-split for
-    // European) so we don't run segmentit on every chunk — segmentit on
-    // accumulating content is O(n²) over a stream and was making the
-    // browser drop chunks. After streaming completes, run segmentit once
-    // for the final segment list the Reader will use.
-    const stillStreamingNow = !savedStoryId
-    const streamSegments = useMemo(() => {
-        if (!streamContent) return []
-        if (stillStreamingNow) {
-            // Fast tokenizer — close enough visually to segmentit's output
-            // that the layout doesn't jump when we re-segment at the end.
-            const isCh = targetLang === 'zh-CN' || targetLang === 'zh-TW'
-            return isCh ? Array.from(streamContent) : (streamContent.match(/\S+|\s+/g) ?? [])
-        }
-        return segmentText(streamContent, targetLang)
-    }, [streamContent, targetLang, stillStreamingNow])
-
-    // ─── Streaming phase ──────────────────────────────────────────────────
-    // Render the same Reader component used by /story/[id]. While storyId is
-    // null and isStreaming=true, tap and progress-save are no-ops; once the
-    // 'done' event arrives we set savedStoryId and the Reader transitions
-    // in-place to "ready" mode — no navigation, no remount.
-    if (phase === 'streaming') {
-        const stillStreaming = !savedStoryId
-        const levelStr = streamLevel !== null ? levelLabel(targetLang, streamLevel) : null
-        const headerStatus = stillStreaming
-            ? (streamContent ? 'Streaming…' : 'Thinking…')
-            : null
+    if (phase === 'loading') {
         return (
-            <StoryShell
-                title={streamTitle || 'Generating…'}
-                level={levelStr}
-                statusLabel={headerStatus}
-                date={null}
-                newWordCount={null}
-            >
-                <div className="flex-1 container mx-auto px-4 py-4 max-w-3xl w-full">
-                    <Reader
-                        segments={streamSegments}
-                        storyId={savedStoryId}
-                        language={targetLang}
-                        isStreaming={stillStreaming}
-                        streamingLabel={streamContent ? 'Streaming…' : 'Thinking…'}
-                    />
-                </div>
-                {streamError && (
-                    <div className="px-4 pb-4 max-w-3xl mx-auto w-full">
-                        <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-lg">
-                            {streamError}
-                        </div>
+            <div className="container mx-auto px-4 py-12 max-w-xl flex flex-col items-center justify-center min-h-[60vh]">
+                <div className="relative mb-8">
+                    <div className="absolute inset-0 bg-retro-primary/20 blur-2xl rounded-full animate-pulse" />
+                    <div className="relative bg-retro-paper rounded-full p-6 border border-retro-primary/30 shadow-lg">
+                        <Sparkles className="text-retro-primary animate-spin [animation-duration:3s]" size={40} />
                     </div>
-                )}
-            </StoryShell>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-retro-primary mb-3 text-center">
+                    Generating your {isNonFiction ? 'article' : 'story'}…
+                </h2>
+                <div className="h-7 mt-2 flex items-center justify-center">
+                    <p
+                        key={activityIndex}
+                        className="text-retro-muted text-sm sm:text-base font-serif italic animate-in fade-in slide-in-from-bottom-2 duration-500"
+                    >
+                        {ACTIVITY_MESSAGES[activityIndex]}
+                    </p>
+                </div>
+                <div className="mt-8 flex gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-retro-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 rounded-full bg-retro-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 rounded-full bg-retro-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+            </div>
         )
     }
 
-    // ─── Form phase ───────────────────────────────────────────────────────
     const selectClass =
         'appearance-none bg-retro-primary/10 border-b-2 border-retro-primary text-retro-primary font-bold px-2 sm:px-3 py-0.5 sm:py-1 pr-7 sm:pr-8 rounded-t hover:bg-retro-primary/20 transition-colors cursor-pointer focus:outline-none disabled:opacity-50'
     const caretClass =
@@ -309,7 +234,6 @@ export default function NewStoryPage() {
                                 <select
                                     value={genre}
                                     onChange={(e) => setGenre(e.target.value)}
-                                    disabled={isLoading}
                                     className={selectClass}
                                 >
                                     {GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
@@ -321,7 +245,6 @@ export default function NewStoryPage() {
                                 <select
                                     value={theme}
                                     onChange={(e) => setTheme(e.target.value)}
-                                    disabled={isLoading}
                                     className={selectClass}
                                 >
                                     {currentThemes.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -333,7 +256,6 @@ export default function NewStoryPage() {
                                 <select
                                     value={setting}
                                     onChange={(e) => setSetting(e.target.value)}
-                                    disabled={isLoading}
                                     className={selectClass}
                                 >
                                     {currentSettings.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -348,7 +270,6 @@ export default function NewStoryPage() {
                                 <select
                                     value={length}
                                     onChange={(e) => setLength(e.target.value)}
-                                    disabled={isLoading}
                                     className={selectClass}
                                 >
                                     {LENGTH_OPTIONS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
@@ -361,7 +282,6 @@ export default function NewStoryPage() {
                                 <select
                                     value={targetLevel}
                                     onChange={(e) => setTargetLevel(e.target.value)}
-                                    disabled={isLoading}
                                     className={selectClass}
                                 >
                                     {levelOpts.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
@@ -378,10 +298,9 @@ export default function NewStoryPage() {
                         <textarea
                             value={freeText}
                             onChange={(e) => setFreeText(e.target.value)}
-                            disabled={isLoading}
                             placeholder="e.g. a dog visiting Tokyo, or a news-style article about climate change"
                             rows={2}
-                            className="w-full bg-retro-bg border border-retro-muted/30 rounded-md px-3 py-2 text-retro-text placeholder:text-retro-muted/50 focus:outline-none focus:border-retro-primary transition-colors font-sans text-sm disabled:opacity-50"
+                            className="w-full bg-retro-bg border border-retro-muted/30 rounded-md px-3 py-2 text-retro-text placeholder:text-retro-muted/50 focus:outline-none focus:border-retro-primary transition-colors font-sans text-sm"
                         />
                     </div>
                 </div>
@@ -390,8 +309,7 @@ export default function NewStoryPage() {
                     <button
                         type="button"
                         onClick={randomize}
-                        disabled={isLoading}
-                        className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-3 rounded-full border-2 border-retro-primary text-retro-primary font-bold text-sm sm:text-base whitespace-nowrap hover:bg-retro-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-3 rounded-full border-2 border-retro-primary text-retro-primary font-bold text-sm sm:text-base whitespace-nowrap hover:bg-retro-primary/10 transition-colors"
                     >
                         <Shuffle size={16} className="sm:hidden" />
                         <Shuffle size={20} className="hidden sm:inline" />
@@ -401,29 +319,18 @@ export default function NewStoryPage() {
                     <button
                         type="button"
                         onClick={handleGenerate}
-                        disabled={isLoading}
-                        className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 rounded-full bg-retro-primary px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-lg font-bold text-retro-bg whitespace-nowrap hover:bg-retro-primary/90 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                        className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 rounded-full bg-retro-primary px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-lg font-bold text-retro-bg whitespace-nowrap hover:bg-retro-primary/90 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
                     >
-                        {isLoading ? (
-                            <>
-                                <Loader2 size={16} className="animate-spin sm:hidden" />
-                                <Loader2 size={20} className="animate-spin hidden sm:inline" />
-                                Thinking…
-                            </>
-                        ) : (
-                            <>
-                                <Sparkles size={16} className="sm:hidden" />
-                                <Sparkles size={20} className="hidden sm:inline" />
-                                Generate {isNonFiction ? 'Article' : 'Story'}
-                            </>
-                        )}
+                        <Sparkles size={16} className="sm:hidden" />
+                        <Sparkles size={20} className="hidden sm:inline" />
+                        Generate {isNonFiction ? 'Article' : 'Story'}
                     </button>
                 </div>
             </div>
 
-            {streamError && (
+            {error && (
                 <div className="mt-8 bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-lg">
-                    {streamError}
+                    {error}
                 </div>
             )}
         </div>

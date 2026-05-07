@@ -8,15 +8,7 @@ import { useChrome } from './ChromeContext'
 
 // Renders the global chrome — except on story-reader routes where we want
 // maximum reading area. /story/new still gets the chrome (it's the form
-// surface, not the reader). Pages can also hide chrome dynamically via
-// useChrome().setChromeHidden — the streaming reader uses this.
-//
-// IMPORTANT: keep the JSX shape stable across isReaderMode toggles. If we
-// returned two different trees here, switching from form-with-chrome to
-// streaming-without-chrome would cause React to remount children — which
-// would wipe the page's local state (phase, streaming buffers, etc.) and
-// snap straight back to the initial state. Conditional opacity-collapse
-// keeps positions stable so children don't remount.
+// surface, not the reader).
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname()
     const { chromeHidden } = useChrome()

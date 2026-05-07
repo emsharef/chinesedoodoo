@@ -5,6 +5,9 @@ import { buildCalibrationContext } from '@/lib/calibration'
 import { Segment, useDefault } from 'segmentit'
 
 export const runtime = 'nodejs'
+// Vercel default is 10s on the free tier — long generations get killed
+// mid-stream. 60s is the Hobby cap and gives Long HSK 6 stories enough room.
+export const maxDuration = 60
 
 const LANG_NAMES: Record<string, string> = {
     'zh-CN': 'Chinese (Simplified)',

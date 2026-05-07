@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 };
 
 import LayoutShell from "@/components/LayoutShell";
+import { ChromeProvider } from "@/components/ChromeContext";
 
 export default function RootLayout({
   children,
@@ -20,7 +21,9 @@ export default function RootLayout({
       <body
         className="antialiased bg-retro-bg text-retro-text font-sans min-h-screen flex flex-col md:flex-row"
       >
-        <LayoutShell>{children}</LayoutShell>
+        <ChromeProvider>
+          <LayoutShell>{children}</LayoutShell>
+        </ChromeProvider>
       </body>
     </html>
   );

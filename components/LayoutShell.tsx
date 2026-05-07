@@ -4,13 +4,16 @@ import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import MobileHeader from './MobileHeader'
+import { useChrome } from './ChromeContext'
 
 // Renders the global chrome — except on story-reader routes where we want
 // maximum reading area. /story/new still gets the chrome (it's the form
-// surface, not the reader).
+// surface, not the reader). Pages can also hide chrome dynamically via
+// useChrome().setChromeHidden — the streaming reader uses this.
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname()
-    const isReaderMode = /^\/story\/[^/]+/.test(pathname) && pathname !== '/story/new'
+    const { chromeHidden } = useChrome()
+    const isReaderMode = chromeHidden || (/^\/story\/[^/]+/.test(pathname) && pathname !== '/story/new')
 
     if (isReaderMode) {
         return (

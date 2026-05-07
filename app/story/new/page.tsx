@@ -1,9 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Shuffle, Sparkles } from 'lucide-react'
 import UserLevelChip from '@/components/UserLevelChip'
+import StoryShell from '@/components/StoryShell'
+import StreamingContent from '@/components/StreamingContent'
+import { useHideChromeWhile } from '@/components/ChromeContext'
 import type { UserLevelSummary } from '@/lib/calibration'
 
 const GENRES = [
@@ -38,8 +41,11 @@ function levelOptions(language: string): { value: string; label: string }[] {
 
 const STORAGE_KEY = 'chinesedoodoo:newStorySelection'
 
+type Phase = 'form' | 'streaming'
+
 export default function NewStoryPage() {
     const router = useRouter()
+    const [phase, setPhase] = useState<Phase>('form')
     const [isLoading, setIsLoading] = useState(false)
     const [genre, setGenre] = useState(GENRES[0])
     const [theme, setTheme] = useState(FICTION_THEMES[0])
@@ -48,11 +54,14 @@ export default function NewStoryPage() {
     const [targetLevel, setTargetLevel] = useState<string>('auto')
     const [freeText, setFreeText] = useState('')
 
-    // Streaming preview state
+    // Streaming state — title arrives mid-stream, content fills incrementally
     const [streamTitle, setStreamTitle] = useState('')
     const [streamContent, setStreamContent] = useState('')
     const [streamError, setStreamError] = useState<string | null>(null)
-    const previewRef = useRef<HTMLDivElement>(null)
+
+    // Hide global chrome while streaming so the StoryShell layout matches what
+    // /story/[id] will render after navigation — no chrome shift on done.
+    useHideChromeWhile(phase === 'streaming')
 
     // User level chip
     const [levelInfo, setLevelInfo] = useState<{ summary: UserLevelSummary; targetLanguage: string } | null>(null)
@@ -82,7 +91,6 @@ export default function NewStoryPage() {
         setLength(LENGTH_OPTIONS[Math.floor(Math.random() * LENGTH_OPTIONS.length)].value)
     }
 
-    // Restore last selection from localStorage on mount; randomize only if nothing saved
     useEffect(() => {
         try {
             const saved = localStorage.getItem(STORAGE_KEY)
@@ -104,18 +112,10 @@ export default function NewStoryPage() {
         }
     }, [])
 
-    // Coerce theme/setting to be valid for the current genre type
     useEffect(() => {
         if (!currentThemes.includes(theme)) setTheme(currentThemes[0])
         if (!currentSettings.includes(setting)) setSetting(currentSettings[0])
     }, [genre, currentThemes, currentSettings, theme, setting])
-
-    // Auto-scroll the preview as content grows
-    useEffect(() => {
-        if (previewRef.current) {
-            previewRef.current.scrollTop = previewRef.current.scrollHeight
-        }
-    }, [streamContent])
 
     function persistSelection() {
         try {
@@ -131,6 +131,7 @@ export default function NewStoryPage() {
         setStreamTitle('')
         setStreamContent('')
         setStreamError(null)
+        setPhase('streaming')
 
         try {
             const response = await fetch('/api/stories/generate', {
@@ -153,13 +154,13 @@ export default function NewStoryPage() {
             const decoder = new TextDecoder()
             let buffer = ''
             let storyId: string | null = null
+            let sawError = false
 
             while (true) {
                 const { done, value } = await reader.read()
                 if (done) break
                 buffer += decoder.decode(value, { stream: true })
 
-                // Each SSE message ends with \n\n
                 const messages = buffer.split('\n\n')
                 buffer = messages.pop() ?? ''
 
@@ -175,27 +176,30 @@ export default function NewStoryPage() {
                     }
                     if (data.type === 'title') setStreamTitle(data.title)
                     else if (data.type === 'chunk') setStreamContent((c) => c + data.text)
-                    else if (data.type === 'error') setStreamError(data.message)
-                    else if (data.type === 'done') {
-                        storyId = data.storyId
+                    else if (data.type === 'error') {
+                        sawError = true
+                        setStreamError(data.message)
                     }
+                    else if (data.type === 'done') storyId = data.storyId
                 }
             }
 
-            if (storyId) {
-                router.push(`/story/${storyId}`)
-            } else if (!streamError) {
+            if (storyId && !sawError) {
+                router.replace(`/story/${storyId}`)
+            } else if (!sawError) {
                 setStreamError('Generation finished without a story ID')
+                setPhase('form')
+            } else {
+                setPhase('form')
             }
         } catch (error) {
             console.error(error)
             setStreamError(error instanceof Error ? error.message : 'Failed to generate story')
+            setPhase('form')
         } finally {
             setIsLoading(false)
         }
     }
-
-    const isStreaming = isLoading && (streamTitle || streamContent)
 
     const targetLang = levelInfo?.targetLanguage ?? 'zh-CN'
     const isChineseLang = targetLang === 'zh-CN' || targetLang === 'zh-TW'
@@ -206,6 +210,30 @@ export default function NewStoryPage() {
     })()
     const levelOpts = levelOptions(targetLang)
 
+    // ─── Streaming phase ──────────────────────────────────────────────────
+    if (phase === 'streaming') {
+        return (
+            <StoryShell
+                title={streamTitle || 'Generating…'}
+                statusLabel={streamContent ? 'Streaming…' : 'Thinking…'}
+                date={null}
+                newWordCount={null}
+            >
+                <div className="flex-1 container mx-auto px-4 py-4 max-w-3xl w-full">
+                    <StreamingContent text={streamContent} isStreaming={true} />
+                </div>
+                {streamError && (
+                    <div className="px-4 pb-4 max-w-3xl mx-auto w-full">
+                        <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-lg">
+                            {streamError}
+                        </div>
+                    </div>
+                )}
+            </StoryShell>
+        )
+    }
+
+    // ─── Form phase ───────────────────────────────────────────────────────
     return (
         <div className="container mx-auto px-4 py-8 max-w-3xl">
             <div className="flex items-center justify-between gap-3 mb-8 flex-wrap">
@@ -291,7 +319,6 @@ export default function NewStoryPage() {
                         </p>
                     </div>
 
-                    {/* Free-text override */}
                     <div className="pt-2">
                         <label className="block text-sm text-retro-muted mb-2 font-sans">
                             Or describe what you want (overrides the dropdowns):
@@ -327,7 +354,7 @@ export default function NewStoryPage() {
                         {isLoading ? (
                             <>
                                 <Loader2 className="animate-spin" />
-                                {isStreaming ? 'Streaming…' : 'Thinking…'}
+                                Thinking…
                             </>
                         ) : (
                             <>
@@ -338,22 +365,6 @@ export default function NewStoryPage() {
                     </button>
                 </div>
             </div>
-
-            {/* Live preview */}
-            {(streamTitle || streamContent) && (
-                <div className="mt-8 bg-retro-paper p-6 rounded-xl border border-retro-muted/20 shadow-lg">
-                    {streamTitle && (
-                        <h2 className="text-2xl font-bold text-retro-primary mb-4">{streamTitle}</h2>
-                    )}
-                    <div
-                        ref={previewRef}
-                        className="font-serif text-retro-text whitespace-pre-wrap leading-loose max-h-96 overflow-y-auto"
-                    >
-                        {streamContent}
-                        {isLoading && <span className="inline-block w-2 h-5 bg-retro-primary/70 animate-pulse ml-1 align-middle" />}
-                    </div>
-                </div>
-            )}
 
             {streamError && (
                 <div className="mt-8 bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-lg">

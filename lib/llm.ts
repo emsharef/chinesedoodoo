@@ -40,10 +40,10 @@ export async function generateStory(
     if (input.provider === 'anthropic') {
         const response = await anthropic.messages.create({
             model: ANTHROPIC_GENERATION_MODEL,
-            max_tokens: 4096,
+            max_tokens: 16000,
             thinking: { type: 'adaptive' },
             output_config: {
-                effort: 'medium',
+                effort: 'low',
                 format: { type: 'json_schema', schema: STORY_SCHEMA },
             },
             system: input.systemPrompt,
@@ -51,7 +51,10 @@ export async function generateStory(
         })
         const textBlock = response.content.find((b) => b.type === 'text')
         if (!textBlock || textBlock.type !== 'text') {
-            throw new Error('No text response from Claude')
+            const types = response.content.map((b) => b.type).join(', ')
+            throw new Error(
+                `No text from Claude (stop_reason=${response.stop_reason}, blocks=[${types}])`,
+            )
         }
         return JSON.parse(textBlock.text)
     }

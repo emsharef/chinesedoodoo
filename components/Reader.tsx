@@ -96,10 +96,10 @@ export default function Reader({
 
     // Char-target initial pagination — replaced by DOM-measured pagination as
     // soon as the measurement div has laid out. Avoids a flash of all-content
-    // before measurement completes.
+    // before measurement completes. Uses a fixed width to keep server and
+    // client pagination identical and avoid a hydration mismatch.
     const initialPages = useMemo(() => {
-        const w = typeof window !== 'undefined' ? window.innerWidth : 1024
-        return paginate(segments, language, { targetChars: defaultTargetChars(w, language) })
+        return paginate(segments, language, { targetChars: defaultTargetChars(1024, language) })
     }, [segments, language])
 
     const [pages, setPages] = useState<string[][]>(initialPages)

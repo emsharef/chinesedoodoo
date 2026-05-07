@@ -91,6 +91,10 @@ export default function NewStoryPage() {
         setTheme(themes[Math.floor(Math.random() * themes.length)])
         setSetting(settings[Math.floor(Math.random() * settings.length)])
         setLength(LENGTH_OPTIONS[Math.floor(Math.random() * LENGTH_OPTIONS.length)].value)
+        // Free-text overrides the dropdowns at submit time, so randomize would
+        // be a no-op visually if we left the textarea populated. Clearing it
+        // keeps the randomized dropdown choice meaningful.
+        setFreeText('')
     }
 
     useEffect(() => {
@@ -266,87 +270,92 @@ export default function NewStoryPage() {
     }
 
     // ─── Form phase ───────────────────────────────────────────────────────
+    const selectClass =
+        'appearance-none bg-retro-primary/10 border-b-2 border-retro-primary text-retro-primary font-bold px-2 sm:px-3 py-0.5 sm:py-1 pr-7 sm:pr-8 rounded-t hover:bg-retro-primary/20 transition-colors cursor-pointer focus:outline-none disabled:opacity-50'
+    const caretClass =
+        'absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 text-retro-primary pointer-events-none text-xs sm:text-sm'
+
     return (
-        <div className="container mx-auto px-4 py-8 max-w-3xl">
-            <div className="flex items-center justify-between gap-3 mb-8 flex-wrap">
-                <div className="flex items-center gap-3">
-                    <Sparkles className="text-retro-primary" size={32} />
-                    <h1 className="text-3xl font-bold text-retro-primary">Story Generator</h1>
+        <div className="container mx-auto px-4 py-6 sm:py-8 max-w-3xl">
+            <div className="flex items-center justify-between gap-3 mb-6 sm:mb-8 flex-wrap">
+                <div className="flex items-center gap-2 sm:gap-3">
+                    <Sparkles className="text-retro-primary" size={24} />
+                    <h1 className="text-xl sm:text-3xl font-bold text-retro-primary">Story Generator</h1>
                 </div>
                 {levelInfo && (
                     <UserLevelChip summary={levelInfo.summary} targetLanguage={levelInfo.targetLanguage} />
                 )}
             </div>
 
-            <div className="bg-retro-paper p-8 rounded-xl border border-retro-muted/20 shadow-lg relative overflow-hidden">
+            <div className="bg-retro-paper p-4 sm:p-8 rounded-xl border border-retro-muted/20 shadow-lg relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-retro-primary/5 rounded-bl-full -z-0" />
 
-                <div className="relative z-10 space-y-6">
-                    <div className="text-xl leading-loose font-serif text-retro-text space-y-4">
+                <div className="relative z-10 space-y-5 sm:space-y-6">
+                    <div className="text-base sm:text-xl leading-relaxed sm:leading-loose font-serif text-retro-text space-y-3 sm:space-y-4">
                         <p>
                             I want to read a
-                            <span className="inline-block mx-2 relative">
+                            <span className="inline-block mx-1 sm:mx-2 relative">
                                 <select
                                     value={genre}
                                     onChange={(e) => setGenre(e.target.value)}
                                     disabled={isLoading}
-                                    className="appearance-none bg-retro-primary/10 border-b-2 border-retro-primary text-retro-primary font-bold px-3 py-1 pr-8 rounded-t hover:bg-retro-primary/20 transition-colors cursor-pointer focus:outline-none disabled:opacity-50"
+                                    className={selectClass}
                                 >
                                     {GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
                                 </select>
-                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-retro-primary pointer-events-none text-sm">▼</span>
+                                <span className={caretClass}>▼</span>
                             </span>
                             {isNonFiction ? 'article' : 'story'} about
-                            <span className="inline-block mx-2 relative">
+                            <span className="inline-block mx-1 sm:mx-2 relative">
                                 <select
                                     value={theme}
                                     onChange={(e) => setTheme(e.target.value)}
                                     disabled={isLoading}
-                                    className="appearance-none bg-retro-primary/10 border-b-2 border-retro-primary text-retro-primary font-bold px-3 py-1 pr-8 rounded-t hover:bg-retro-primary/20 transition-colors cursor-pointer focus:outline-none disabled:opacity-50"
+                                    className={selectClass}
                                 >
                                     {currentThemes.map((t) => <option key={t} value={t}>{t}</option>)}
                                 </select>
-                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-retro-primary pointer-events-none text-sm">▼</span>
+                                <span className={caretClass}>▼</span>
                             </span>
                             set in
-                            <span className="inline-block mx-2 relative">
+                            <span className="inline-block mx-1 sm:mx-2 relative">
                                 <select
                                     value={setting}
                                     onChange={(e) => setSetting(e.target.value)}
                                     disabled={isLoading}
-                                    className="appearance-none bg-retro-primary/10 border-b-2 border-retro-primary text-retro-primary font-bold px-3 py-1 pr-8 rounded-t hover:bg-retro-primary/20 transition-colors cursor-pointer focus:outline-none disabled:opacity-50"
+                                    className={selectClass}
                                 >
                                     {currentSettings.map((s) => <option key={s} value={s}>{s}</option>)}
                                 </select>
-                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-retro-primary pointer-events-none text-sm">▼</span>
+                                <span className={caretClass}>▼</span>
                             </span>.
                         </p>
 
                         <p>
                             It should be
-                            <span className="inline-block mx-2 relative">
+                            <span className="inline-block mx-1 sm:mx-2 relative">
                                 <select
                                     value={length}
                                     onChange={(e) => setLength(e.target.value)}
                                     disabled={isLoading}
-                                    className="appearance-none bg-retro-primary/10 border-b-2 border-retro-primary text-retro-primary font-bold px-3 py-1 pr-8 rounded-t hover:bg-retro-primary/20 transition-colors cursor-pointer focus:outline-none disabled:opacity-50"
+                                    className={selectClass}
                                 >
                                     {LENGTH_OPTIONS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
                                 </select>
-                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-retro-primary pointer-events-none text-sm">▼</span>
+                                <span className={caretClass}>▼</span>
                             </span>
-                            <span className="text-retro-muted text-base ml-1">({lengthHint})</span>
+                            <span className="text-retro-muted text-xs sm:text-base ml-1">({lengthHint})</span>
                             {' '}at level
-                            <span className="inline-block mx-2 relative">
+                            <span className="inline-block mx-1 sm:mx-2 relative">
                                 <select
                                     value={targetLevel}
                                     onChange={(e) => setTargetLevel(e.target.value)}
                                     disabled={isLoading}
-                                    className="appearance-none bg-retro-primary/10 border-b-2 border-retro-primary text-retro-primary font-bold px-3 py-1 pr-8 rounded-t hover:bg-retro-primary/20 transition-colors cursor-pointer focus:outline-none disabled:opacity-50"
+                                    className={selectClass}
                                 >
                                     {levelOpts.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
                                 </select>
-                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-retro-primary pointer-events-none text-sm">▼</span>
+                                <span className={caretClass}>▼</span>
                             </span>.
                         </p>
                     </div>

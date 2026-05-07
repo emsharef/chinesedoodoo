@@ -26,16 +26,8 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
 
     if (!story) redirect('/')
 
-    let segments: string[] = []
-    const isChinese = !story.language || story.language === 'zh-CN' || story.language === 'zh-TW'
-
-    if (isChinese) {
-        const { Segment, useDefault } = await import('segmentit')
-        const segmentit = useDefault(new Segment())
-        segments = segmentit.doSegment(story.content).map(s => s.w)
-    } else {
-        segments = story.content.match(/[\wÀ-ÿ]+|[^\w\sÀ-ÿ]+|\s+/g) || [story.content]
-    }
+    const { segmentText } = await import('@/lib/segment')
+    const segments = segmentText(story.content, story.language || 'zh-CN')
 
     const levelStr = levelLabel(story.language, story.difficulty_level)
     const dateStr = new Date(story.created_at).toLocaleDateString()

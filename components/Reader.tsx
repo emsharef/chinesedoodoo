@@ -9,12 +9,17 @@ import { pinyin } from 'pinyin-pro'
 
 interface ReaderProps {
     segments: string[]
-    storyId: string
+    storyId: string | null
     fontSize?: string
     language?: string
     initialPosition?: number
     isRead?: boolean
     readAt?: string | null
+    // While streaming: word-tap is disabled, progress isn't saved, difficulty
+    // buttons stay hidden, and we auto-advance to the latest page so the user
+    // sees new text as it arrives.
+    isStreaming?: boolean
+    streamingLabel?: string
 }
 
 const FONT_SIZES: Record<string, string> = {
@@ -85,6 +90,8 @@ export default function Reader({
     initialPosition = 0,
     isRead = false,
     readAt = null,
+    isStreaming = false,
+    streamingLabel,
 }: ReaderProps) {
     const [selectedWord, setSelectedWord] = useState<string | null>(null)
     const [definition, setDefinition] = useState<DefinitionResult | null>(null)
@@ -159,13 +166,24 @@ export default function Reader({
         }
     }, [segments, fontSize, showPinyin, language])
 
-    // Persist progress (max-only enforced on the server)
+    // Persist progress (max-only enforced on the server). Skip while streaming
+    // or before we have a real story id.
     useEffect(() => {
+        if (isStreaming || !storyId) return
         const handle = setTimeout(() => {
             saveReadingProgress(storyId, currentSegmentIndex).catch(() => {})
         }, 600)
         return () => clearTimeout(handle)
-    }, [currentSegmentIndex, storyId])
+    }, [currentSegmentIndex, storyId, isStreaming])
+
+    // Auto-advance to the last page as content streams in, so the user sees
+    // new text arriving instead of being stuck on page 1.
+    useEffect(() => {
+        if (!isStreaming || pages.length === 0) return
+        const target = firstSegmentOfPage(pages, pages.length - 1)
+        setCurrentSegmentIndex(target)
+        // Re-run when pages array changes (re-pagination after new chunk)
+    }, [isStreaming, pages])
 
     // Keyboard nav
     useEffect(() => {
@@ -222,6 +240,7 @@ export default function Reader({
 
     async function handleWordClick(word: string) {
         if (!word.trim()) return
+        if (isStreaming || !storyId) return // tap is inert until streaming completes
 
         setSelectedWord(word)
         setIsLoading(true)
@@ -244,6 +263,7 @@ export default function Reader({
     }
 
     async function handleCompleteStory(rating: 'easy' | 'good' | 'hard') {
+        if (!storyId) return
         setIsLoading(true)
         try {
             const { markStoryAsRead } = await import('@/app/actions/complete-story')
@@ -392,7 +412,12 @@ export default function Reader({
                 Without this, ResizeObserver would re-trigger pagination on
                 each page change and we'd get oscillating page counts. */}
             <div className="mt-4 shrink-0 h-[110px] flex items-center justify-center">
-                {isLastPage && (
+                {isStreaming ? (
+                    <div className="flex items-center gap-2 text-retro-muted">
+                        <span className="inline-block w-2 h-5 bg-retro-primary/70 animate-pulse" />
+                        <span className="text-sm font-mono">{streamingLabel || 'Streaming…'}</span>
+                    </div>
+                ) : isLastPage && (
                     isRead ? (
                         <p className="text-retro-muted text-sm">
                             ✓ Read{readAt ? ` on ${new Date(readAt).toLocaleDateString()}` : ''}

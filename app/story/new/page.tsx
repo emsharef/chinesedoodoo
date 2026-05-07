@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useMemo } from 'react'
 import { Loader2, Shuffle, Sparkles } from 'lucide-react'
 import UserLevelChip from '@/components/UserLevelChip'
 import StoryShell from '@/components/StoryShell'
-import StreamingContent from '@/components/StreamingContent'
+import Reader from '@/components/Reader'
 import { useHideChromeWhile } from '@/components/ChromeContext'
+import { segmentText } from '@/lib/segment'
+import { levelLabel } from '@/lib/levels'
 import type { UserLevelSummary } from '@/lib/calibration'
 
 const GENRES = [
@@ -44,7 +45,6 @@ const STORAGE_KEY = 'chinesedoodoo:newStorySelection'
 type Phase = 'form' | 'streaming'
 
 export default function NewStoryPage() {
-    const router = useRouter()
     const [phase, setPhase] = useState<Phase>('form')
     const [isLoading, setIsLoading] = useState(false)
     const [genre, setGenre] = useState(GENRES[0])
@@ -57,7 +57,9 @@ export default function NewStoryPage() {
     // Streaming state — title arrives mid-stream, content fills incrementally
     const [streamTitle, setStreamTitle] = useState('')
     const [streamContent, setStreamContent] = useState('')
+    const [streamLevel, setStreamLevel] = useState<number | null>(null)
     const [streamError, setStreamError] = useState<string | null>(null)
+    const [savedStoryId, setSavedStoryId] = useState<string | null>(null)
 
     // Hide global chrome while streaming so the StoryShell layout matches what
     // /story/[id] will render after navigation — no chrome shift on done.
@@ -130,6 +132,8 @@ export default function NewStoryPage() {
         setIsLoading(true)
         setStreamTitle('')
         setStreamContent('')
+        setStreamLevel(null)
+        setSavedStoryId(null)
         setStreamError(null)
         setPhase('streaming')
 
@@ -175,6 +179,7 @@ export default function NewStoryPage() {
                         continue
                     }
                     if (data.type === 'title') setStreamTitle(data.title)
+                    else if (data.type === 'level') setStreamLevel(data.level)
                     else if (data.type === 'chunk') setStreamContent((c) => c + data.text)
                     else if (data.type === 'error') {
                         sawError = true
@@ -185,7 +190,11 @@ export default function NewStoryPage() {
             }
 
             if (storyId && !sawError) {
-                router.replace(`/story/${storyId}`)
+                // Promote the streaming Reader to "ready": tap activates,
+                // difficulty buttons appear on last page, progress saves.
+                // Update URL silently — no navigation, no remount, no flicker.
+                setSavedStoryId(storyId)
+                window.history.replaceState({}, '', `/story/${storyId}`)
             } else if (!sawError) {
                 setStreamError('Generation finished without a story ID')
                 setPhase('form')
@@ -210,17 +219,40 @@ export default function NewStoryPage() {
     })()
     const levelOpts = levelOptions(targetLang)
 
+    // Segment streaming content client-side as it arrives, so the Reader
+    // renders identically during streaming and after completion.
+    const streamSegments = useMemo(
+        () => segmentText(streamContent, targetLang),
+        [streamContent, targetLang],
+    )
+
     // ─── Streaming phase ──────────────────────────────────────────────────
+    // Render the same Reader component used by /story/[id]. While storyId is
+    // null and isStreaming=true, tap and progress-save are no-ops; once the
+    // 'done' event arrives we set savedStoryId and the Reader transitions
+    // in-place to "ready" mode — no navigation, no remount.
     if (phase === 'streaming') {
+        const stillStreaming = !savedStoryId
+        const levelStr = streamLevel !== null ? levelLabel(targetLang, streamLevel) : null
+        const headerStatus = stillStreaming
+            ? (streamContent ? 'Streaming…' : 'Thinking…')
+            : null
         return (
             <StoryShell
                 title={streamTitle || 'Generating…'}
-                statusLabel={streamContent ? 'Streaming…' : 'Thinking…'}
+                level={levelStr}
+                statusLabel={headerStatus}
                 date={null}
                 newWordCount={null}
             >
                 <div className="flex-1 container mx-auto px-4 py-4 max-w-3xl w-full">
-                    <StreamingContent text={streamContent} isStreaming={true} />
+                    <Reader
+                        segments={streamSegments}
+                        storyId={savedStoryId}
+                        language={targetLang}
+                        isStreaming={stillStreaming}
+                        streamingLabel={streamContent ? 'Streaming…' : 'Thinking…'}
+                    />
                 </div>
                 {streamError && (
                     <div className="px-4 pb-4 max-w-3xl mx-auto w-full">

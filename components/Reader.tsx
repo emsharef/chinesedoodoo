@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Smile, ThumbsUp, Dumbbell, ChevronLeft, ChevronRight, Languages } from 'lucide-react'
 import { lookupWord } from '@/app/actions/lookup'
 import { paginate, defaultTargetChars } from '@/lib/pagination'
@@ -274,27 +274,28 @@ export default function Reader({
         }
     }
 
-    const renderWord = useCallback(
-        (word: string, key: string | number) => (
-            <span
-                key={key}
-                onClick={() => handleWordClick(word)}
-                className={`
-                    cursor-pointer hover:bg-retro-primary/20 hover:text-retro-primary rounded px-0.5 transition-colors relative group
-                    ${selectedWord === word ? 'bg-retro-primary/30 text-retro-primary' : ''}
-                `}
-            >
-                {isChinese && (showPinyin || (selectedWord === word && definition?.pinyin)) && (
-                    <span className="block text-xs text-retro-muted text-center w-full absolute -top-4 left-0 font-sans whitespace-nowrap overflow-visible">
-                        {selectedWord === word && definition?.pinyin
-                            ? definition.pinyin
-                            : pinyin(word, { toneType: 'symbol' })}
-                    </span>
-                )}
-                {word}
-            </span>
-        ),
-        [selectedWord, definition?.pinyin, showPinyin, isChinese],
+    // Plain function — not useCallback. Memoizing this caused stale-closure
+    // bugs where the spans rendered during streaming kept their old
+    // handleWordClick (which early-returned because isStreaming was true at
+    // that capture). Recomputing per render is cheap.
+    const renderWord = (word: string, key: string | number) => (
+        <span
+            key={key}
+            onClick={() => handleWordClick(word)}
+            className={`
+                cursor-pointer hover:bg-retro-primary/20 hover:text-retro-primary rounded px-0.5 transition-colors relative group
+                ${selectedWord === word ? 'bg-retro-primary/30 text-retro-primary' : ''}
+            `}
+        >
+            {isChinese && (showPinyin || (selectedWord === word && definition?.pinyin)) && (
+                <span className="block text-xs text-retro-muted text-center w-full absolute -top-4 left-0 font-sans whitespace-nowrap overflow-visible">
+                    {selectedWord === word && definition?.pinyin
+                        ? definition.pinyin
+                        : pinyin(word, { toneType: 'symbol' })}
+                </span>
+            )}
+            {word}
+        </span>
     )
 
     // pt-4 when pinyin is showing so the first row's pinyin (-top-4 above each

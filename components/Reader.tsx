@@ -176,15 +176,6 @@ export default function Reader({
         return () => clearTimeout(handle)
     }, [currentSegmentIndex, storyId, isStreaming])
 
-    // Auto-advance to the last page as content streams in, so the user sees
-    // new text arriving instead of being stuck on page 1.
-    useEffect(() => {
-        if (!isStreaming || pages.length === 0) return
-        const target = firstSegmentOfPage(pages, pages.length - 1)
-        setCurrentSegmentIndex(target)
-        // Re-run when pages array changes (re-pagination after new chunk)
-    }, [isStreaming, pages])
-
     // Keyboard nav
     useEffect(() => {
         function onKey(e: KeyboardEvent) {

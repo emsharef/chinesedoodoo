@@ -147,11 +147,13 @@ export async function* generateStoryStream(
     }
 
     if (input.provider === 'anthropic') {
+        // Streaming wants the first token ASAP for responsive UX. Adaptive
+        // thinking can add 5-30s of latency before any text streams, which
+        // looks like a hang in the browser. Disable thinking for the stream.
         const stream = anthropic.messages.stream({
             model: ANTHROPIC_GENERATION_MODEL,
             max_tokens: 4096,
-            thinking: { type: 'adaptive' },
-            output_config: { effort: 'medium' },
+            thinking: { type: 'disabled' },
             system,
             messages: [{ role: 'user', content: input.userPrompt }],
         })

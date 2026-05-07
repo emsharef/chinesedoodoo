@@ -223,12 +223,23 @@ export default function NewStoryPage() {
     })()
     const levelOpts = levelOptions(targetLang)
 
-    // Segment streaming content client-side as it arrives, so the Reader
-    // renders identically during streaming and after completion.
-    const streamSegments = useMemo(
-        () => segmentText(streamContent, targetLang),
-        [streamContent, targetLang],
-    )
+    // Segment streaming content client-side. While streaming, use a cheap
+    // tokenizer (one char per segment for Chinese, whitespace-split for
+    // European) so we don't run segmentit on every chunk — segmentit on
+    // accumulating content is O(n²) over a stream and was making the
+    // browser drop chunks. After streaming completes, run segmentit once
+    // for the final segment list the Reader will use.
+    const stillStreamingNow = !savedStoryId
+    const streamSegments = useMemo(() => {
+        if (!streamContent) return []
+        if (stillStreamingNow) {
+            // Fast tokenizer — close enough visually to segmentit's output
+            // that the layout doesn't jump when we re-segment at the end.
+            const isCh = targetLang === 'zh-CN' || targetLang === 'zh-TW'
+            return isCh ? Array.from(streamContent) : (streamContent.match(/\S+|\s+/g) ?? [])
+        }
+        return segmentText(streamContent, targetLang)
+    }, [streamContent, targetLang, stillStreamingNow])
 
     // ─── Streaming phase ──────────────────────────────────────────────────
     // Render the same Reader component used by /story/[id]. While storyId is

@@ -274,7 +274,7 @@ export default function Reader({
                 `}
             >
                 {isChinese && (showPinyin || (selectedWord === word && definition?.pinyin)) && (
-                    <span className="block text-xs text-retro-muted text-center w-full absolute -top-5 left-0 font-sans whitespace-nowrap overflow-visible">
+                    <span className="block text-xs text-retro-muted text-center w-full absolute -top-4 left-0 font-sans whitespace-nowrap overflow-visible">
                         {selectedWord === word && definition?.pinyin
                             ? definition.pinyin
                             : pinyin(word, { toneType: 'symbol' })}
@@ -286,7 +286,11 @@ export default function Reader({
         [selectedWord, definition?.pinyin, showPinyin, isChinese],
     )
 
-    const readerTextClasses = `prose prose-invert prose-lg max-w-none ${FONT_SIZES[fontSize]} leading-loose tracking-wide font-serif`
+    // pt-4 when pinyin is showing so the first row's pinyin (-top-4 above each
+    // word) doesn't get clipped by the reading area's overflow-hidden.
+    const readerTextClasses = `prose prose-invert prose-lg max-w-none ${FONT_SIZES[fontSize]} leading-loose tracking-wide font-serif${
+        showPinyin && isChinese ? ' pt-4' : ''
+    }`
 
     return (
         <div className="relative flex flex-col h-[calc(100vh-7rem)] sm:h-[calc(100vh-8rem)]">
@@ -300,9 +304,9 @@ export default function Reader({
             >
                 <p className="flex flex-wrap gap-x-1 gap-y-4 items-end">
                     {segments.map((word, index) => (
-                        <span key={`m-${index}`} data-seg={index} className="px-0.5">
+                        <span key={`m-${index}`} data-seg={index} className="px-0.5 relative">
                             {isChinese && showPinyin && (
-                                <span className="block text-xs text-center w-full absolute -top-5 left-0 font-sans whitespace-nowrap">
+                                <span className="block text-xs text-center w-full absolute -top-4 left-0 font-sans whitespace-nowrap">
                                     {pinyin(word, { toneType: 'symbol' })}
                                 </span>
                             )}

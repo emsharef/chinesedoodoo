@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useMemo, useRef, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { BookOpen, CheckCircle, Smile, ThumbsUp, Dumbbell, Search, Trash2 } from 'lucide-react'
+import { BookOpen, CheckCircle, Smile, ThumbsUp, Dumbbell, Search, Trash2, X } from 'lucide-react'
 import { levelLabel } from '@/lib/levels'
 import { deleteStory } from '@/app/actions/delete-story'
 
@@ -44,9 +44,20 @@ export default function LibraryGrid({
 
     const [filter, setFilter] = useState<Filter>(initialFilter)
     const [search, setSearch] = useState('')
+    const [searchOpen, setSearchOpen] = useState(false)
     const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
     const [, startTransition] = useTransition()
     const router = useRouter()
+    const searchInputRef = useRef<HTMLInputElement>(null)
+
+    useEffect(() => {
+        if (searchOpen) searchInputRef.current?.focus()
+    }, [searchOpen])
+
+    function closeSearch() {
+        setSearch('')
+        setSearchOpen(false)
+    }
 
     function handleDelete(e: React.MouseEvent, story: Story) {
         e.preventDefault()
@@ -79,35 +90,59 @@ export default function LibraryGrid({
 
     return (
         <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-retro-muted pointer-events-none" />
-                    <input
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search by title…"
-                        className="w-full bg-retro-paper border border-retro-muted/20 rounded-md pl-9 pr-3 py-2 text-retro-text placeholder:text-retro-muted/50 focus:outline-none focus:border-retro-primary text-sm"
-                    />
+            {searchOpen ? (
+                <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-retro-muted pointer-events-none" />
+                        <input
+                            ref={searchInputRef}
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') closeSearch()
+                            }}
+                            placeholder="Search by title…"
+                            className="w-full bg-retro-paper border border-retro-muted/20 rounded-md pl-9 pr-3 py-2 text-retro-text placeholder:text-retro-muted/50 focus:outline-none focus:border-retro-primary text-sm"
+                        />
+                    </div>
+                    <button
+                        onClick={closeSearch}
+                        aria-label="Close search"
+                        className="p-2 rounded-md text-retro-muted hover:text-retro-text hover:bg-retro-paper transition-colors"
+                    >
+                        <X size={18} />
+                    </button>
                 </div>
-                <div className="flex gap-2">
-                    {(['all', 'unread', 'read'] as Filter[]).map((f) => {
-                        const count = f === 'all' ? stories.length : f === 'unread' ? unreadCount : stories.length - unreadCount
-                        return (
-                            <button
-                                key={f}
-                                onClick={() => setFilter(f)}
-                                className={`px-3 py-1.5 rounded-md text-sm border transition-colors capitalize ${
-                                    filter === f
-                                        ? 'bg-retro-primary text-retro-bg border-retro-primary font-semibold'
-                                        : 'bg-retro-paper text-retro-muted border-retro-muted/20 hover:text-retro-text'
-                                }`}
-                            >
-                                {f} <span className="opacity-60">{count}</span>
-                            </button>
-                        )
-                    })}
+            ) : (
+                <div className="flex items-center gap-2">
+                    <div className="flex gap-2 flex-1 flex-wrap">
+                        {(['all', 'unread', 'read'] as Filter[]).map((f) => {
+                            const count = f === 'all' ? stories.length : f === 'unread' ? unreadCount : stories.length - unreadCount
+                            return (
+                                <button
+                                    key={f}
+                                    onClick={() => setFilter(f)}
+                                    className={`px-3 py-1.5 rounded-md text-sm border transition-colors capitalize ${
+                                        filter === f
+                                            ? 'bg-retro-primary text-retro-bg border-retro-primary font-semibold'
+                                            : 'bg-retro-paper text-retro-muted border-retro-muted/20 hover:text-retro-text'
+                                    }`}
+                                >
+                                    {f} <span className="opacity-60">{count}</span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                    <button
+                        onClick={() => setSearchOpen(true)}
+                        aria-label="Search stories"
+                        title="Search stories"
+                        className="p-2 rounded-md text-retro-muted hover:text-retro-primary hover:bg-retro-primary/10 transition-colors"
+                    >
+                        <Search size={18} />
+                    </button>
                 </div>
-            </div>
+            )}
 
             {filtered.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-retro-muted/20 rounded-xl">
@@ -124,6 +159,7 @@ export default function LibraryGrid({
                             <button
                                 onClick={() => {
                                     setSearch('')
+                                    setSearchOpen(false)
                                     setFilter('all')
                                 }}
                                 className="text-retro-primary hover:underline text-sm"

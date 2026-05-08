@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { BookOpen, CheckCircle, Smile, ThumbsUp, Dumbbell, Search } from 'lucide-react'
+import { BookOpen, CheckCircle, Smile, ThumbsUp, Dumbbell, Search, Trash2 } from 'lucide-react'
 import { levelLabel } from '@/lib/levels'
+import { deleteStory } from '@/app/actions/delete-story'
 
 interface Story {
     id: string
@@ -42,6 +44,26 @@ export default function LibraryGrid({
 
     const [filter, setFilter] = useState<Filter>(initialFilter)
     const [search, setSearch] = useState('')
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+    const [, startTransition] = useTransition()
+    const router = useRouter()
+
+    function handleDelete(e: React.MouseEvent, story: Story) {
+        e.preventDefault()
+        e.stopPropagation()
+        if (!confirm(`Delete "${story.title}"? This cannot be undone.`)) return
+        setPendingDeleteId(story.id)
+        startTransition(async () => {
+            const result = await deleteStory(story.id)
+            if (!result.success) {
+                alert(`Failed to delete: ${result.error ?? 'unknown error'}`)
+                setPendingDeleteId(null)
+                return
+            }
+            router.refresh()
+            setPendingDeleteId(null)
+        })
+    }
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase()
@@ -117,9 +139,19 @@ export default function LibraryGrid({
                         <Link
                             key={story.id}
                             href={`/story/${story.id}`}
-                            className="group block p-6 bg-retro-paper rounded-xl border border-retro-muted/20 hover:border-retro-primary/50 transition-all hover:shadow-lg hover:shadow-retro-primary/5"
+                            className="group relative block p-6 bg-retro-paper rounded-xl border border-retro-muted/20 hover:border-retro-primary/50 transition-all hover:shadow-lg hover:shadow-retro-primary/5"
                         >
-                            <div className="flex items-start justify-between mb-4">
+                            <button
+                                type="button"
+                                onClick={(e) => handleDelete(e, story)}
+                                disabled={pendingDeleteId === story.id}
+                                aria-label="Delete story"
+                                title="Delete story"
+                                className="absolute top-3 right-3 p-1.5 rounded-md text-retro-muted/60 hover:text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                            <div className="flex items-start justify-between mb-4 pr-8">
                                 <div className="flex items-center gap-2">
                                     <div className="p-2 bg-retro-bg rounded-lg text-retro-primary group-hover:text-retro-accent transition-colors">
                                         <BookOpen size={24} />

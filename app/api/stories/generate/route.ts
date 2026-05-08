@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { generateStory, type LLMProvider } from '@/lib/llm'
 import { buildCalibrationContext } from '@/lib/calibration'
-import { Segment, useDefault } from 'segmentit'
+import { segmentText } from '@/lib/segment'
+import { isCharCountedLang } from '@/lib/levels'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -10,6 +11,8 @@ export const maxDuration = 60
 const LANG_NAMES: Record<string, string> = {
     'zh-CN': 'Chinese (Simplified)',
     'zh-TW': 'Chinese (Traditional)',
+    ja: 'Japanese',
+    ko: 'Korean',
     de: 'German',
     it: 'Italian',
     es: 'Spanish',
@@ -36,15 +39,6 @@ interface RequestBody {
     freeText?: string
 }
 
-function segmentText(content: string, language: string): string[] {
-    const isChinese = language === 'zh-CN' || language === 'zh-TW'
-    if (isChinese) {
-        const segmentit = useDefault(new Segment())
-        return segmentit.doSegment(content).map((s) => s.w)
-    }
-    return Array.from(content.matchAll(/[\p{L}\p{M}]+/gu)).map((m) => m[0])
-}
-
 export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -62,10 +56,10 @@ export async function POST(req: NextRequest) {
     const provider: LLMProvider = (profile?.llm_provider as LLMProvider) || 'anthropic'
     const debugMode = !!profile?.debug_mode
     const langName = LANG_NAMES[targetLang] || targetLang
-    const isChinese = targetLang === 'zh-CN' || targetLang === 'zh-TW'
+    const charCounted = isCharCountedLang(targetLang)
     const lengthKey = body.length || 'medium'
-    const targetLength = (isChinese ? CHAR_LENGTH_MAP : WORD_LENGTH_MAP)[lengthKey] ?? (isChinese ? 300 : 200)
-    const lengthUnit = isChinese ? 'characters' : 'words'
+    const targetLength = (charCounted ? CHAR_LENGTH_MAP : WORD_LENGTH_MAP)[lengthKey] ?? (charCounted ? 300 : 200)
+    const lengthUnit = charCounted ? 'characters' : 'words'
 
     const [{ count: knownCount }, { data: learningRows }, { data: recentStories }, { data: knownRows }] = await Promise.all([
         supabase
@@ -107,7 +101,9 @@ export async function POST(req: NextRequest) {
     const unknownWordsInRecent: string[] = []
     if (recentStories && recentStories.length > 0 && learningWords.length > 0) {
         const allText = recentStories.map((s) => s.content).join(' ')
-        const matcher = isChinese
+        // No-word-boundary languages (Chinese, Japanese) match by substring;
+        // others use word-boundary regex so "the" doesn't match "there".
+        const matcher = charCounted
             ? (w: string) => allText.includes(w)
             : (w: string) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'iu').test(allText)
         for (const w of learningWords) {
@@ -159,7 +155,7 @@ export async function POST(req: NextRequest) {
         }
 
         const segments = segmentText(content, targetLang).filter(
-            (s) => s.trim().length > 0 && !/^[\s.,!?;:"'()\[\]，。！？；：""''（）]+$/.test(s),
+            (s) => s.trim().length > 0 && /\p{L}/u.test(s),
         )
         const reviewWordsLandedSet = new Set(
             requestedReviewWords.filter((w) => segments.includes(w)),

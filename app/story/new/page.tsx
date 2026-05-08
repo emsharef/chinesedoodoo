@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Shuffle, Sparkles } from 'lucide-react'
 import UserLevelChip from '@/components/UserLevelChip'
 import type { UserLevelSummary } from '@/lib/calibration'
+import { levelLabel, isCharCountedLang } from '@/lib/levels'
 
 const GENRES = [
     'Sci-Fi', 'Fantasy', 'Mystery', 'Romance', 'Slice of Life', 'Fable', 'Thriller', 'Comedy', 'Horror', 'Wuxia',
@@ -19,19 +20,15 @@ const FICTION_SETTINGS = ['A futuristic city', 'An ancient village', 'A space st
 const NON_FICTION_SETTINGS = ['Wall Street', 'Silicon Valley', 'Beijing', 'The United Nations', 'A Research Lab', 'A Museum', 'A Tech Conference', 'The Stock Exchange', 'A University', 'A Government Building']
 
 const LENGTH_OPTIONS = [
-    { label: 'Short', value: 'short', chineseChars: 100, words: 60 },
-    { label: 'Medium', value: 'medium', chineseChars: 300, words: 200 },
-    { label: 'Long', value: 'long', chineseChars: 600, words: 400 },
+    { label: 'Short', value: 'short', chars: 100, words: 60 },
+    { label: 'Medium', value: 'medium', chars: 300, words: 200 },
+    { label: 'Long', value: 'long', chars: 600, words: 400 },
 ]
 
-const HSK_LEVELS = [1, 2, 3, 4, 5, 6]
-const CEFR_LABELS = ['', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2']
-
 function levelOptions(language: string): { value: string; label: string }[] {
-    const isChinese = language === 'zh-CN' || language === 'zh-TW'
     const opts = [{ value: 'auto', label: 'Auto' }]
-    for (const n of HSK_LEVELS) {
-        opts.push({ value: String(n), label: isChinese ? `HSK ${n}` : CEFR_LABELS[n] })
+    for (let n = 1; n <= 6; n++) {
+        opts.push({ value: String(n), label: levelLabel(language, n) })
     }
     return opts
 }
@@ -169,11 +166,11 @@ export default function NewStoryPage() {
     }
 
     const targetLang = levelInfo?.targetLanguage ?? 'zh-CN'
-    const isChineseLang = targetLang === 'zh-CN' || targetLang === 'zh-TW'
+    const charCounted = isCharCountedLang(targetLang)
     const lengthHint = (() => {
         const opt = LENGTH_OPTIONS.find((l) => l.value === length)
         if (!opt) return ''
-        return isChineseLang ? `~${opt.chineseChars} chars` : `~${opt.words} words`
+        return charCounted ? `~${opt.chars} chars` : `~${opt.words} words`
     })()
     const levelOpts = levelOptions(targetLang)
 

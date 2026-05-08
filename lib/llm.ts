@@ -231,10 +231,12 @@ const LOOKUP_SCHEMA = {
 export async function lookupWord(
     input: LookupWordInput,
 ): Promise<LookupWordResult> {
-    const isChinese = input.language === 'zh-CN' || input.language === 'zh-TW'
-    const pronunciationLabel = isChinese
-        ? 'pinyin with tone marks'
-        : 'phonetic pronunciation (IPA or standard transcription)'
+    const pronunciationLabel = (() => {
+        if (input.language === 'zh-CN' || input.language === 'zh-TW') return 'pinyin with tone marks'
+        if (input.language === 'ja') return 'hiragana reading (no kanji)'
+        if (input.language === 'ko') return 'revised romanization'
+        return 'phonetic pronunciation (IPA or standard transcription)'
+    })()
     const prompt = `Define the word "${input.word}" (Language: ${input.language}).
 Output JSON: { "pinyin": "${pronunciationLabel}", "english": "concise english definition" }`
 

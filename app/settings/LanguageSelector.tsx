@@ -7,6 +7,8 @@ import { Globe } from 'lucide-react'
 const LANGUAGES = [
     { value: 'zh-CN', label: 'Simplified Chinese', flag: '🇨🇳' },
     { value: 'zh-TW', label: 'Traditional Chinese', flag: '🇹🇼' },
+    { value: 'ja', label: 'Japanese', flag: '🇯🇵' },
+    { value: 'ko', label: 'Korean', flag: '🇰🇷' },
     { value: 'de', label: 'German', flag: '🇩🇪' },
     { value: 'it', label: 'Italian', flag: '🇮🇹' },
     { value: 'es', label: 'Spanish', flag: '🇪🇸' },

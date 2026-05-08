@@ -93,6 +93,22 @@ const HSK_RUBRIC = `LEVEL SCALE (Chinese, HSK 1-6):
 - 5 = HSK 5: ~2500 chars; news/literary register, idioms, sophisticated grammar
 - 6 = HSK 6: ~5000 chars; advanced literary/news, native-level reading`
 
+const TOPIK_RUBRIC = `LEVEL SCALE (Korean, TOPIK 1-6):
+- 1 = TOPIK 1: ~800 most common words; present tense; basic introductions, simple sentences
+- 2 = TOPIK 2: ~1500-2000 words; past/future, daily routines, casual conversation
+- 3 = TOPIK 3: ~3000 words; opinions, social topics, more complex sentence patterns
+- 4 = TOPIK 4: ~4000 words; abstract topics, hanja-influenced vocabulary, news/work
+- 5 = TOPIK 5: ~5000+ words; idiomatic, formal/written register, sophisticated grammar
+- 6 = TOPIK 6: full range; native-level reading, literary and academic Korean`
+
+const JLPT_RUBRIC = `LEVEL SCALE (Japanese, JLPT N5..N1 + advanced):
+- 1 = JLPT N5: ~100 kanji, ~800 words; basic hiragana/katakana, simple present-tense
+- 2 = JLPT N4: ~300 kanji, ~1500 words; past tense, te-form, daily conversation
+- 3 = JLPT N3: ~650 kanji, ~3700 words; intermediate connectives, opinions, more abstract
+- 4 = JLPT N2: ~1000 kanji, ~6000 words; news, work emails, complex grammar
+- 5 = JLPT N1: ~2000 kanji, ~10000+ words; literary, idiomatic, professional register
+- 6 = N1+ (advanced): native-level literary and specialised reading`
+
 const CEFR_RUBRIC = `LEVEL SCALE (CEFR A1-C2 mapped to 1-6):
 - 1 = A1: ~500 most common words; present tense; simple SVO; basic personal info
 - 2 = A2: ~1000 words; past tense, daily routines, basic descriptions
@@ -102,50 +118,58 @@ const CEFR_RUBRIC = `LEVEL SCALE (CEFR A1-C2 mapped to 1-6):
 - 6 = C2: full range; literary/professional native-level reading`
 
 function rubricFor(language: string): string {
-    const isChinese = language === 'zh-CN' || language === 'zh-TW'
-    return isChinese ? HSK_RUBRIC : CEFR_RUBRIC
+    if (language === 'zh-CN' || language === 'zh-TW') return HSK_RUBRIC
+    if (language === 'ko') return TOPIK_RUBRIC
+    if (language === 'ja') return JLPT_RUBRIC
+    return CEFR_RUBRIC
+}
+
+// Char-counted: no spaces between words (Chinese, Japanese). Korean has
+// spaces and reads more naturally as word count.
+function isCharCounted(language: string): boolean {
+    return language === 'zh-CN' || language === 'zh-TW' || language === 'ja'
 }
 
 function storyLength(content: string, language: string): number {
-    const isChinese = language === 'zh-CN' || language === 'zh-TW'
-    if (isChinese) {
-        // Count Chinese characters only — punctuation/whitespace don't count
-        return Array.from(content).filter((c) => /[一-鿿]/.test(c)).length
+    if (isCharCounted(language)) {
+        // Count letter-class characters only — drop punctuation/whitespace.
+        return Array.from(content).filter((c) => /\p{L}/u.test(c)).length
     }
     return content.split(/\s+/).filter(Boolean).length
 }
 
 function lengthUnitFor(language: string): string {
-    const isChinese = language === 'zh-CN' || language === 'zh-TW'
-    return isChinese ? 'chars' : 'words'
+    return isCharCounted(language) ? 'chars' : 'words'
 }
 
 function excerptOf(content: string, language: string, maxLen = 200): string {
-    const isChinese = language === 'zh-CN' || language === 'zh-TW'
     if (content.length <= maxLen) return content.trim()
-    if (isChinese) return content.slice(0, maxLen).trim() + '…'
-    // Avoid cutting mid-word in European languages
+    if (isCharCounted(language)) return content.slice(0, maxLen).trim() + '…'
+    // Avoid cutting mid-word in space-separated languages
     const truncated = content.slice(0, maxLen)
     const lastSpace = truncated.lastIndexOf(' ')
     return (lastSpace > maxLen * 0.6 ? truncated.slice(0, lastSpace) : truncated).trim() + '…'
 }
 
+const JLPT_BY_LEVEL = ['N5', 'N5', 'N4', 'N3', 'N2', 'N1', 'N1+']
+const CEFR_BY_LEVEL = ['A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2']
+
 function levelLabel(language: string, level: number): string {
-    const isChinese = language === 'zh-CN' || language === 'zh-TW'
-    if (isChinese) return `HSK ${level}`
-    const cefr = ['A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'][Math.max(0, Math.min(6, level))]
-    return cefr ?? 'A1'
+    const n = Math.max(0, Math.min(6, level))
+    if (language === 'zh-CN' || language === 'zh-TW') return `HSK ${n}`
+    if (language === 'ko') return `TOPIK ${n}`
+    if (language === 'ja') return `JLPT ${JLPT_BY_LEVEL[n] ?? 'N5'}`
+    return CEFR_BY_LEVEL[n] ?? 'A1'
 }
 
 export function buildCalibrationContext(input: CalibrationInput): string {
     const { knownVocabCount, knownWords, learningWords, recentStories, targetLanguage, targetLanguageName, manualLevel } = input
 
     if (knownVocabCount < 20 && recentStories.length === 0 && manualLevel === undefined) {
-        const isChinese = targetLanguage === 'zh-CN' || targetLanguage === 'zh-TW'
-        const level = isChinese ? 'HSK 1 (Beginner)' : 'CEFR A1 (Beginner)'
+        const beginnerLabel = `${levelLabel(targetLanguage, 1)} (Beginner)`
         return `
 USER PROFILE
-- This is a brand new ${targetLanguageName} learner. Treat as ${level}.
+- This is a brand new ${targetLanguageName} learner. Treat as ${beginnerLabel}.
 - Use very simple sentences and basic vocabulary. Introduce a few simple words.
 
 ${rubricFor(targetLanguage)}

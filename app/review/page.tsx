@@ -37,7 +37,6 @@ export default function ReviewPage() {
     const [language, setLanguage] = useState<string>('zh-CN')
 
     const currentItem = queue[0]
-    const isChinese = language === 'zh-CN' || language === 'zh-TW'
 
     const loadQueue = useCallback(async (lang: string, target: number) => {
         setIsLoading(true)
@@ -203,7 +202,7 @@ export default function ReviewPage() {
                     <div className="text-center w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
                         {definition ? (
                             <>
-                                {isChinese && definition.pinyin && (
+                                {definition.pinyin && (
                                     <p className="text-2xl text-retro-accent font-mono mb-4">{definition.pinyin}</p>
                                 )}
                                 <p className="text-lg text-retro-muted mb-4">{definition.english}</p>

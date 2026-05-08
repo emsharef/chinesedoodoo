@@ -247,12 +247,9 @@ export default function Reader({
         setIsLoading(true)
         try {
             const { markStoryAsRead } = await import('@/app/actions/complete-story')
-            let words: string[] = []
-            if (isChinese) {
-                words = segments.filter((s) => /[一-龥]/.test(s))
-            } else {
-                words = segments.filter((s) => s.trim().length > 0 && !/^[.,!?;:"'()\[\]]+$/.test(s))
-            }
+            // Keep any segment that contains a letter character. Drops pure
+            // punctuation/whitespace across all languages.
+            const words = segments.filter((s) => /\p{L}/u.test(s))
             await markStoryAsRead(storyId, rating, words, language, Array.from(tappedWords))
             window.location.href = '/'
         } catch (error) {
@@ -446,7 +443,7 @@ export default function Reader({
                                     <div className="text-retro-muted animate-pulse">Loading definition...</div>
                                 ) : definition ? (
                                     <div>
-                                        {isChinese && <p className="text-xl font-mono text-retro-accent mb-1">{definition.pinyin}</p>}
+                                        {definition.pinyin && <p className="text-xl font-mono text-retro-accent mb-1">{definition.pinyin}</p>}
                                         <p className="text-lg text-retro-text">{definition.english}</p>
                                     </div>
                                 ) : (

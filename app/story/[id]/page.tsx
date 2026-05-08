@@ -27,9 +27,27 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
     if (!story) redirect('/')
 
     const { segmentText } = await import('@/lib/segment')
-    const segments = segmentText(story.content, story.language || 'zh-CN')
+    const language = story.language || 'zh-CN'
+    const segments = segmentText(story.content, language)
 
-    const levelStr = levelLabel(story.language, story.difficulty_level)
+    // For Japanese, pre-load the user's cached hiragana readings (LLM-provided
+    // on lookup) so the reader's phonetic overlay can display them above
+    // kanji-containing words without a fresh API call.
+    let readings: Record<string, string> | undefined
+    if (language === 'ja') {
+        const { data: vocab } = await supabase
+            .from('chinese_vocab_items')
+            .select('word, pinyin')
+            .eq('user_id', user.id)
+            .eq('language', 'ja')
+            .not('pinyin', 'is', null)
+        readings = {}
+        for (const r of vocab ?? []) {
+            if (r.pinyin) readings[r.word as string] = r.pinyin as string
+        }
+    }
+
+    const levelStr = levelLabel(language, story.difficulty_level)
     const dateStr = new Date(story.created_at).toLocaleDateString()
 
     return (
@@ -44,10 +62,11 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
                     segments={segments}
                     storyId={story.id}
                     fontSize={profile?.font_size || 'medium'}
-                    language={story.language || 'zh-CN'}
+                    language={language}
                     initialPosition={story.current_position ?? 0}
                     isRead={!!story.is_read}
                     readAt={story.read_at}
+                    readings={readings}
                 />
             </div>
 

@@ -6,6 +6,7 @@ import { lookupWord } from '@/app/actions/lookup'
 import { paginate, defaultTargetChars } from '@/lib/pagination'
 import { saveReadingProgress } from '@/app/actions/reading-progress'
 import { pinyin } from 'pinyin-pro'
+import { romanizeKorean, hasHangul, hasKanji, hasPhonetic } from '@/lib/romanize'
 
 interface ReaderProps {
     segments: string[]
@@ -15,6 +16,10 @@ interface ReaderProps {
     initialPosition?: number
     isRead?: boolean
     readAt?: string | null
+    // Japanese only: a {word: hiragana-reading} map for words the user has
+    // already looked up. Words not in the map render without a reading;
+    // the map grows as the user taps new words during this session.
+    readings?: Record<string, string>
 }
 
 const FONT_SIZES: Record<string, string> = {
@@ -85,14 +90,33 @@ export default function Reader({
     initialPosition = 0,
     isRead = false,
     readAt = null,
+    readings,
 }: ReaderProps) {
     const [selectedWord, setSelectedWord] = useState<string | null>(null)
     const [definition, setDefinition] = useState<DefinitionResult | null>(null)
     const [isLoading, setIsLoading] = useState(false)
-    const [showPinyin, setShowPinyin] = useState(false)
+    const [showPhonetic, setShowPhonetic] = useState(false)
     const [tappedWords, setTappedWords] = useState<Set<string>>(new Set())
+    // Japanese readings extend as the user looks up new words this session.
+    const [localReadings, setLocalReadings] = useState<Record<string, string>>(readings ?? {})
 
     const isChinese = language === 'zh-CN' || language === 'zh-TW'
+    const isKorean = language === 'ko'
+    const isJapanese = language === 'ja'
+    const phoneticAvailable = hasPhonetic(language)
+
+    // Per-segment phonetic string. Empty string = nothing to display.
+    function phoneticFor(word: string): string {
+        if (isChinese) return pinyin(word, { toneType: 'symbol' })
+        if (isKorean) return hasHangul(word) ? romanizeKorean(word) : ''
+        if (isJapanese) {
+            // Only show readings on segments containing kanji; pure-kana
+            // segments are already phonetic by themselves.
+            if (!hasKanji(word)) return ''
+            return localReadings[word] ?? ''
+        }
+        return ''
+    }
 
     // Char-target initial pagination — replaced by DOM-measured pagination as
     // soon as the measurement div has laid out. Avoids a flash of all-content
@@ -157,7 +181,7 @@ export default function Reader({
             cancelled = true
             ro.disconnect()
         }
-    }, [segments, fontSize, showPinyin, language])
+    }, [segments, fontSize, showPhonetic, language])
 
     // Persist progress (max-only enforced on the server).
     useEffect(() => {
@@ -236,6 +260,11 @@ export default function Reader({
         try {
             const result = await lookupWord(word, language)
             setDefinition(result)
+            // Cache the reading so the phonetic overlay can show it for this
+            // word on subsequent renders without another lookup.
+            if (isJapanese && result.pinyin) {
+                setLocalReadings((m) => (m[word] === result.pinyin ? m : { ...m, [word]: result.pinyin! }))
+            }
         } catch (error) {
             console.error('Lookup failed', error)
         } finally {
@@ -260,30 +289,37 @@ export default function Reader({
         }
     }
 
-    const renderWord = (word: string, key: string | number) => (
-        <span
-            key={key}
-            onClick={() => handleWordClick(word)}
-            className={`
-                cursor-pointer hover:bg-retro-primary/20 hover:text-retro-primary rounded px-0.5 transition-colors relative group
-                ${selectedWord === word ? 'bg-retro-primary/30 text-retro-primary' : ''}
-            `}
-        >
-            {isChinese && (showPinyin || (selectedWord === word && definition?.pinyin)) && (
-                <span className="block text-xs text-retro-muted text-center w-full absolute -top-4 left-0 font-sans whitespace-nowrap overflow-visible">
-                    {selectedWord === word && definition?.pinyin
-                        ? definition.pinyin
-                        : pinyin(word, { toneType: 'symbol' })}
-                </span>
-            )}
-            {word}
-        </span>
-    )
+    const renderWord = (word: string, key: string | number) => {
+        const livePhonetic = phoneticFor(word)
+        const showOverlay = phoneticAvailable && (
+            (showPhonetic && livePhonetic) ||
+            (selectedWord === word && definition?.pinyin)
+        )
+        return (
+            <span
+                key={key}
+                onClick={() => handleWordClick(word)}
+                className={`
+                    cursor-pointer hover:bg-retro-primary/20 hover:text-retro-primary rounded px-0.5 transition-colors relative group
+                    ${selectedWord === word ? 'bg-retro-primary/30 text-retro-primary' : ''}
+                `}
+            >
+                {showOverlay && (
+                    <span className="block text-xs text-retro-muted text-center w-full absolute -top-4 left-0 font-sans whitespace-nowrap overflow-visible">
+                        {selectedWord === word && definition?.pinyin
+                            ? definition.pinyin
+                            : livePhonetic}
+                    </span>
+                )}
+                {word}
+            </span>
+        )
+    }
 
-    // pt-4 when pinyin is showing so the first row's pinyin (-top-4 above each
-    // word) doesn't get clipped by the reading area's overflow-hidden.
+    // pt-4 when the phonetic overlay is showing so the first row's text
+    // (-top-4 above each word) doesn't get clipped by overflow-hidden.
     const readerTextClasses = `prose prose-invert prose-lg max-w-none ${FONT_SIZES[fontSize]} leading-loose tracking-wide font-serif${
-        showPinyin && isChinese ? ' pt-4' : ''
+        showPhonetic && phoneticAvailable ? ' pt-4' : ''
     }`
 
     return (
@@ -297,16 +333,19 @@ export default function Reader({
                 style={{ visibility: 'hidden' }}
             >
                 <p className="flex flex-wrap gap-x-1 gap-y-4 items-end">
-                    {segments.map((word, index) => (
-                        <span key={`m-${index}`} data-seg={index} className="px-0.5 relative">
-                            {isChinese && showPinyin && (
-                                <span className="block text-xs text-center w-full absolute -top-4 left-0 font-sans whitespace-nowrap">
-                                    {pinyin(word, { toneType: 'symbol' })}
-                                </span>
-                            )}
-                            {word}
-                        </span>
-                    ))}
+                    {segments.map((word, index) => {
+                        const ph = showPhonetic && phoneticAvailable ? phoneticFor(word) : ''
+                        return (
+                            <span key={`m-${index}`} data-seg={index} className="px-0.5 relative">
+                                {ph && (
+                                    <span className="block text-xs text-center w-full absolute -top-4 left-0 font-sans whitespace-nowrap">
+                                        {ph}
+                                    </span>
+                                )}
+                                {word}
+                            </span>
+                        )
+                    })}
                 </p>
             </div>
 
@@ -315,13 +354,13 @@ export default function Reader({
                 <span className="text-xs text-retro-muted font-mono tabular-nums">
                     {currentPage + 1} / {totalPages}
                 </span>
-                {isChinese && (
+                {phoneticAvailable && (
                     <button
-                        onClick={() => setShowPinyin(!showPinyin)}
-                        aria-label={showPinyin ? 'Hide pinyin' : 'Show pinyin'}
-                        title={showPinyin ? 'Hide pinyin' : 'Show pinyin'}
+                        onClick={() => setShowPhonetic(!showPhonetic)}
+                        aria-label={showPhonetic ? 'Hide pronunciation' : 'Show pronunciation'}
+                        title={showPhonetic ? 'Hide pronunciation' : 'Show pronunciation'}
                         className={`p-1.5 rounded-md transition-colors ${
-                            showPinyin
+                            showPhonetic
                                 ? 'bg-retro-primary/20 text-retro-primary'
                                 : 'text-retro-muted hover:text-retro-primary hover:bg-retro-primary/10'
                         }`}

@@ -33,6 +33,17 @@
   }
 }
 
+/* iOS Safari zooms in on focus when an input's font-size is below 16px.
+   Pin the minimum at 16px on small screens so the page stays put. Outside
+   @layer base + !important so it beats Tailwind utilities like text-sm. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

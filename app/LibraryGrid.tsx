@@ -139,19 +139,9 @@ export default function LibraryGrid({
                         <Link
                             key={story.id}
                             href={`/story/${story.id}`}
-                            className="group relative block p-6 bg-retro-paper rounded-xl border border-retro-muted/20 hover:border-retro-primary/50 transition-all hover:shadow-lg hover:shadow-retro-primary/5"
+                            className="group block p-6 bg-retro-paper rounded-xl border border-retro-muted/20 hover:border-retro-primary/50 transition-all hover:shadow-lg hover:shadow-retro-primary/5"
                         >
-                            <button
-                                type="button"
-                                onClick={(e) => handleDelete(e, story)}
-                                disabled={pendingDeleteId === story.id}
-                                aria-label="Delete story"
-                                title="Delete story"
-                                className="absolute top-3 right-3 p-1.5 rounded-md text-retro-muted/60 hover:text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                            <div className="flex items-start justify-between mb-4 pr-8">
+                            <div className="flex items-center justify-between mb-4 gap-2">
                                 <div className="flex items-center gap-2">
                                     <div className="p-2 bg-retro-bg rounded-lg text-retro-primary group-hover:text-retro-accent transition-colors">
                                         <BookOpen size={24} />
@@ -165,15 +155,27 @@ export default function LibraryGrid({
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex flex-col items-end">
-                                    <span className="text-xs font-mono text-retro-muted border border-retro-muted/30 px-2 py-1 rounded">
-                                        {levelLabel(story.language ?? targetLang, story.difficulty_level)}
-                                    </span>
-                                    {story.is_read && story.read_at && (
-                                        <span className="text-[10px] text-retro-muted mt-1">
-                                            {new Date(story.read_at).toLocaleDateString()}
+                                <div className="flex items-center gap-2">
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-xs font-mono text-retro-muted border border-retro-muted/30 px-2 py-1 rounded">
+                                            {levelLabel(story.language ?? targetLang, story.difficulty_level)}
                                         </span>
-                                    )}
+                                        {story.is_read && story.read_at && (
+                                            <span className="text-[10px] text-retro-muted mt-1">
+                                                {new Date(story.read_at).toLocaleDateString()}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleDelete(e, story)}
+                                        disabled={pendingDeleteId === story.id}
+                                        aria-label="Delete story"
+                                        title="Delete story"
+                                        className="p-1.5 rounded-md text-retro-muted/60 hover:text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
                                 </div>
                             </div>
                             <h2 className={`${currentSize.title} font-bold text-retro-text group-hover:text-retro-primary transition-colors mb-2`}>

@@ -43,7 +43,6 @@ export async function generateStory(
             max_tokens: 16000,
             thinking: { type: 'adaptive' },
             output_config: {
-                effort: 'low',
                 format: { type: 'json_schema', schema: STORY_SCHEMA },
             },
             system: input.systemPrompt,

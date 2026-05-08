@@ -13,17 +13,18 @@ export interface Branding {
 // All localizations preserve the "du" beat from 读读 (dúdú).
 // CJK family carries the meaning across via the shared Sino root for "read":
 //   读 (Chinese dú) = 読 (Japanese doku) = 독 (Korean dok)
-// Reduplicating those gives a sound-and-sense match.
-// European titles keep DuDu as a brand suffix — no native "du-for-read" to
-// translate, but DuDu travels well as a name. German bonus: "du" = "you".
+// Asian titles use the suffix form ([Lang]读读) because that's the natural
+// reading. European titles use a prefixed alliterative chant — DuDuDeutsch
+// rolls off the tongue better than Deutsch DuDu, and "du" doubles as the
+// German word for "you" so the joke lands twice.
 const BRANDING: Record<string, Branding> = {
     'zh-CN': { title: '中文读读', font: 'chinese' },
     'zh-TW': { title: '中文讀讀', font: 'chinese' },
     ja: { title: '日本語ドクドク', font: 'japanese' },
     ko: { title: '한국어 독독', font: 'korean' },
-    de: { title: 'Deutsch DuDu', font: 'latin' },
-    it: { title: 'Italiano DuDu', font: 'latin' },
-    es: { title: 'Español DuDu', font: 'latin' },
+    de: { title: 'DuDuDeutsch', font: 'latin' },
+    it: { title: 'DuDuItaliano', font: 'latin' },
+    es: { title: 'DuDuEspañol', font: 'latin' },
 }
 
 export function brandingFor(language: string | null | undefined): Branding {

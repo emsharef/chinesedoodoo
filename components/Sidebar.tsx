@@ -4,19 +4,27 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Library, PlusCircle, BookOpen, Settings, List } from 'lucide-react'
-import { Ma_Shan_Zheng } from 'next/font/google'
+import { Ma_Shan_Zheng, Yuji_Syuku, Gaegu, Caveat } from 'next/font/google'
 import { createClient } from '@/utils/supabase/client'
 import { getDueCount } from '@/app/review/actions'
+import { brandingFor, type FontKey } from '@/lib/branding'
 
-const logoFont = Ma_Shan_Zheng({
-    weight: '400',
-    subsets: ['latin'],
-    preload: true,
-})
+const chineseFont = Ma_Shan_Zheng({ weight: '400', subsets: ['latin'], preload: true })
+const japaneseFont = Yuji_Syuku({ weight: '400', subsets: ['latin'], preload: false })
+const koreanFont = Gaegu({ weight: '700', subsets: ['latin'], preload: false })
+const latinFont = Caveat({ subsets: ['latin'], preload: false })
+
+function fontClassFor(key: FontKey): string {
+    if (key === 'chinese') return chineseFont.className
+    if (key === 'japanese') return japaneseFont.className
+    if (key === 'korean') return koreanFont.className
+    return latinFont.className
+}
 
 export default function Sidebar() {
     const pathname = usePathname()
     const [dueCount, setDueCount] = useState<number | null>(null)
+    const [targetLang, setTargetLang] = useState<string | null>(null)
 
     // Hide sidebar on login page
     const isPublic =
@@ -40,7 +48,10 @@ export default function Sidebar() {
                 .single()
             const lang = profile?.target_language || 'zh-CN'
             const count = await getDueCount(lang)
-            if (!cancelled) setDueCount(count)
+            if (!cancelled) {
+                setDueCount(count)
+                setTargetLang(lang)
+            }
         }
         load()
         return () => {
@@ -58,11 +69,13 @@ export default function Sidebar() {
         { href: '/settings', label: 'Settings', icon: Settings },
     ]
 
+    const branding = brandingFor(targetLang)
+
     return (
         <aside className="hidden md:flex w-64 bg-retro-paper border-r border-retro-muted/20 h-screen fixed left-0 top-0 flex-col p-6 z-40">
             <div className="mb-10">
-                <h1 className={`${logoFont.className} text-4xl text-retro-primary tracking-wider`}>
-                    中文读读
+                <h1 className={`${fontClassFor(branding.font)} text-4xl text-retro-primary tracking-wider`}>
+                    {branding.title}
                 </h1>
             </div>
 

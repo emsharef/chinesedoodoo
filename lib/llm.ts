@@ -23,30 +23,46 @@ export interface GenerateStoryResult {
     estimated_level: number
 }
 
-const STORY_SCHEMA = {
-    type: 'object',
-    properties: {
-        title: { type: 'string' },
-        content: { type: 'string' },
-        estimated_level: { type: 'integer' },
-    },
-    required: ['title', 'content', 'estimated_level'],
-    additionalProperties: false,
-} as const
+// We frame the response with [TITLE] / [LEVEL] tags rather than constraining
+// the model to a JSON schema. Empirically Sonnet 4.6 produces stories that
+// are 4-5x longer with framing tags than with output_config.format json_schema
+// (~700 chars vs ~150 for the same prompt) — schema mode pushes the model
+// toward terse, conservative output.
+const STORY_FRAMING = `
+
+OUTPUT FORMAT — produce nothing but the following, in this exact order:
+[TITLE]<story title in target language>[/TITLE]
+[LEVEL]<integer 1-6>[/LEVEL]
+<full story body in target language>
+
+The body starts on the line after [/LEVEL]. Do not include any other prose, markdown, code fences, or commentary. Write a complete narrative with a clear ending.`
+
+function parseFramedStory(text: string): GenerateStoryResult {
+    const titleM = text.match(/\[TITLE\]([\s\S]*?)\[\/TITLE\]/i)
+    const levelM = text.match(/\[LEVEL\]\s*(\d+)\s*\[\/LEVEL\]/i)
+    const body = text
+        .replace(/\[TITLE\][\s\S]*?\[\/TITLE\]/i, '')
+        .replace(/\[LEVEL\][\s\S]*?\[\/LEVEL\]/i, '')
+        .trim()
+    return {
+        title: (titleM?.[1] ?? '').trim() || 'Untitled',
+        content: body,
+        estimated_level: levelM ? Math.max(1, Math.min(6, parseInt(levelM[1], 10))) : 1,
+    }
+}
 
 export async function generateStory(
     input: GenerateStoryInput,
 ): Promise<GenerateStoryResult> {
+    const system = input.systemPrompt + STORY_FRAMING
+
     if (input.provider === 'anthropic') {
         const response = await anthropic.messages.create({
             model: ANTHROPIC_GENERATION_MODEL,
             max_tokens: 16000,
             thinking: { type: 'enabled', budget_tokens: 6000 },
-            output_config: {
-                effort: 'high',
-                format: { type: 'json_schema', schema: STORY_SCHEMA },
-            },
-            system: input.systemPrompt,
+            output_config: { effort: 'high' },
+            system,
             messages: [{ role: 'user', content: input.userPrompt }],
         })
         const textBlock = response.content.find((b) => b.type === 'text')
@@ -56,18 +72,17 @@ export async function generateStory(
                 `No text from Claude (stop_reason=${response.stop_reason}, blocks=[${types}])`,
             )
         }
-        return JSON.parse(textBlock.text)
+        return parseFramedStory(textBlock.text)
     }
 
     const completion = await openai.chat.completions.create({
         model: OPENAI_GENERATION_MODEL,
         messages: [
-            { role: 'system', content: input.systemPrompt },
+            { role: 'system', content: system },
             { role: 'user', content: input.userPrompt },
         ],
-        response_format: { type: 'json_object' },
     })
-    return JSON.parse(completion.choices[0].message.content || '{}')
+    return parseFramedStory(completion.choices[0].message.content || '')
 }
 
 // Streaming generation. Yields events as the model emits text. We instruct the

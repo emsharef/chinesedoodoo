@@ -38,11 +38,17 @@ export async function generateStory(
     input: GenerateStoryInput,
 ): Promise<GenerateStoryResult> {
     if (input.provider === 'anthropic') {
+        // effort: 'medium' is required. The default 'high' makes Sonnet 4.6
+        // think for 60+ seconds on story generation, which blows the Vercel
+        // 60s function timeout and surfaces in the browser as a JSON-parse
+        // failure on a killed connection. 'low' produces terse output that
+        // truncates the story. 'medium' completes in ~7s with end_turn.
         const response = await anthropic.messages.create({
             model: ANTHROPIC_GENERATION_MODEL,
             max_tokens: 16000,
             thinking: { type: 'adaptive' },
             output_config: {
+                effort: 'medium',
                 format: { type: 'json_schema', schema: STORY_SCHEMA },
             },
             system: input.systemPrompt,

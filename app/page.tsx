@@ -1,7 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Plus } from 'lucide-react'
 import LibraryGrid from './LibraryGrid'
 import UserLevelChip from '@/components/UserLevelChip'
 import { summarizeUserLevel } from '@/lib/calibration'
@@ -36,24 +34,10 @@ export default async function Dashboard() {
   const levelSummary = summarizeUserLevel(recentRead as any)
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <header className="flex justify-between items-center mb-8 flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-retro-primary">Library</h1>
-          <p className="text-retro-muted mt-1">Welcome back, {user.email}</p>
-          <div className="mt-3">
-            <UserLevelChip summary={levelSummary} targetLanguage={targetLang} />
-          </div>
-        </div>
-        <div className="flex gap-4">
-          <Link
-            href="/story/new"
-            className="flex items-center gap-2 bg-retro-primary text-retro-bg px-4 py-2 rounded-md font-semibold hover:bg-retro-primary/90 transition-colors"
-          >
-            <Plus size={20} />
-            New Story
-          </Link>
-        </div>
+    <div className="container mx-auto px-4 py-6 sm:py-8">
+      <header className="flex items-center justify-between gap-3 mb-5 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-retro-primary">Library</h1>
+        <UserLevelChip summary={levelSummary} targetLanguage={targetLang} />
       </header>
 
       <LibraryGrid

@@ -5,6 +5,7 @@ import { buildCalibrationContext } from '@/lib/calibration'
 import { Segment, useDefault } from 'segmentit'
 
 export const runtime = 'nodejs'
+export const maxDuration = 60
 
 const LANG_NAMES: Record<string, string> = {
     'zh-CN': 'Chinese (Simplified)',
